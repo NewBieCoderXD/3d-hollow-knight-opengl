@@ -1,0 +1,14 @@
+{
+  "clangd.fallbackFlags": [
+    "--target=x86_64-linux-gnu",
+    "-I/usr/lib/gcc/x86_64-linux-gnu/13/include",
+    "-I/usr/bin/include",
+    "-I/usr/include",
+    "-I/usr/include/c++/13",
+    "-I${workspaceFolder}/includes"
+  ],
+  "C_Cpp.intelliSenseEngine": "disabled",
+  "code-runner.executorMap": {
+    "cpp": "cd \"$workspaceRoot\" && cmake -S . -B build && cmake --build build && bin/main"
+  }
+}
