@@ -1,6 +1,7 @@
 #ifndef MODEL_H
 #define MODEL_H
 
+#include <assimp/anim.h>
 #include <glad/glad.h>
 
 #include <assimp/Importer.hpp>
@@ -24,7 +25,7 @@ using namespace std;
 unsigned int TextureFromFile(const char *path, const string &directory,
                              bool flip_image, bool gamma = false);
 
-class Model {
+class _Model {
 public:
   // model data
   vector<Texture>
@@ -35,13 +36,14 @@ public:
   bool gammaCorrection;
 
   // constructor, expects a filepath to a 3D model.
-  Model(string const &path, bool flip_image = false, bool gamma = false)
+  _Model(string const &path, bool flip_image = false, bool gamma = false)
       : gammaCorrection(gamma) {
     loadModel(path, flip_image);
   }
 
   // draws the model, and thus all its meshes
   void Draw(Shader &shader) {
+    
     for (unsigned int i = 0; i < meshes.size(); i++)
       meshes[i].Draw(shader);
   }
@@ -64,6 +66,7 @@ private:
     }
     // retrieve the directory path of the filepath
     directory = path.substr(0, path.find_last_of('/'));
+
 
     // process ASSIMP's root node recursively
     processNode(scene->mRootNode, scene, flip_image);

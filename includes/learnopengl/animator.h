@@ -11,6 +11,11 @@
 class Animator
 {
 public:
+  void setAnimation(Animation* animation){
+		m_CurrentTime = 0.0;
+		m_CurrentAnimation = animation;
+  }
+
 	Animator(Animation* animation)
 	{
 		m_CurrentTime = 0.0;

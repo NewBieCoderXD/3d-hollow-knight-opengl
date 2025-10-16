@@ -1,5 +1,6 @@
 #pragma once
 
+#include <assimp/anim.h>
 #include <vector>
 #include <map>
 #include <glm/glm.hpp>
@@ -36,6 +37,16 @@ public:
 		ReadMissingBones(animation, *model);
 	}
 
+	Animation(const aiScene& scene, aiAnimation* animation, Model* model)
+	{
+    m_Duration = animation->mDuration;
+    m_TicksPerSecond = animation->mTicksPerSecond;
+    aiMatrix4x4 globalTransformation = scene.mRootNode->mTransformation;
+    globalTransformation = globalTransformation.Inverse();
+    ReadHierarchyData(m_RootNode, scene.mRootNode);
+    ReadMissingBones(animation, *model);
+	}
+
 	~Animation()
 	{
 	}
@@ -66,8 +77,8 @@ private:
 	{
 		int size = animation->mNumChannels;
 
-		auto& boneInfoMap = model.GetBoneInfoMap();//getting m_BoneInfoMap from Model class
-		int& boneCount = model.GetBoneCount(); //getting the m_BoneCounter from Model class
+		auto& boneInfoMap = model.GetBoneInfoMap();//getting m_BoneInfoMap from ModelAnimation class
+		int& boneCount = model.GetBoneCount(); //getting the m_BoneCounter from ModelAnimation class
 
 		//reading channels(bones engaged in an animation and their keyframes)
 		for (int i = 0; i < size; i++)

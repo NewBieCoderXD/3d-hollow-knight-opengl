@@ -41,6 +41,17 @@ public:
         loadModel(path);
     }
 
+    Model(const aiScene* scene, const std::string& directory, bool gamma = false)
+        : gammaCorrection(gamma), directory(directory)
+    {
+        if (!scene || !scene->mRootNode)
+        {
+            std::cerr << "ERROR::MODEL::INVALID_SCENE_POINTER\n";
+            return;
+        }
+        processNode(scene->mRootNode, scene);
+    }
+
     // draws the model, and thus all its meshes
     void Draw(Shader &shader)
     {
