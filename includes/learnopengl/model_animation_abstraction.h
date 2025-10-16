@@ -2,25 +2,25 @@
 #include "learnopengl/animation.h"
 #include "learnopengl/animator.h"
 #include "learnopengl/model_animation.h"
+#include <assimp/Importer.hpp>
 #include <learnopengl/filesystem.h>
 #include <memory>
 
 class ModelAnimationAbs {
 public:
   std::unique_ptr<Model> model;
+  Animator animator;
+  const aiScene *scene;
 
-  ModelAnimationAbs(const std::string &path, bool gamma = false)
+  ModelAnimationAbs(Assimp::Importer &importer, const std::string &path,
+                    bool gamma = false)
       : animator(NULL) {
-
-    Assimp::Importer importer;
-    const aiScene *scene =
+    scene =
         importer.ReadFile(FileSystem::getPath(path),
                           aiProcess_Triangulate | aiProcess_GenSmoothNormals |
                               aiProcess_CalcTangentSpace);
     this->model = std::make_unique<Model>(
         Model(scene, path.substr(0, path.find_last_of('/')), false));
-
-    // this->animations=scene->mAnimations;
 
     for (unsigned int i = 0; i < scene->mNumAnimations; i++) {
       aiAnimation *anim = scene->mAnimations[i];
@@ -39,5 +39,4 @@ public:
 
 private:
   std::map<string, Animation> nameToAnimation{};
-  Animator animator;
 };

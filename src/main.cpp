@@ -10,8 +10,8 @@
 #include <learnopengl/camera.h>
 #include <learnopengl/filesystem.h>
 #include <learnopengl/model.h>
-#include <learnopengl/shader_m.h>
 #include <learnopengl/model_animation_abstraction.h>
+#include <learnopengl/shader_m.h>
 
 #include <learnopengl/animator.h>
 
@@ -85,9 +85,12 @@ int main() {
   Shader texturedModelShader("src/texturedModel.vert",
                              "src/texturedModel.frag");
 
+  Assimp::Importer importer;
+
   // load models
   // -----------
-  ModelAnimationAbs knight("resources/hollow-knight-the-knight/source/Knight.glb");
+  ModelAnimationAbs knight(importer,
+      "resources/hollow-knight-the-knight/hollow-knight-the-knight.glb");
   // Model
   // ourModel("/home/frook/Downloads/hornet_-_hollow_knight_silksong.glb");
 
@@ -137,6 +140,7 @@ int main() {
 
     texturedModelShader.setMat4("model", model);
     knight.setAnimation("slash");
+    knight.animator.UpdateAnimation(1);
     knight.model->Draw(texturedModelShader);
 
     // ourShader.setMat4("projection", projection);
