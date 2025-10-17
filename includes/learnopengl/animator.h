@@ -11,6 +11,9 @@
 class Animator
 {
 public:
+	Animation* m_CurrentAnimation;
+	float m_CurrentTime;
+	float m_DeltaTime;
   void setAnimation(Animation* animation){
 		m_CurrentTime = 0.0;
 		m_CurrentAnimation = animation;
@@ -76,10 +79,11 @@ public:
 		return m_FinalBoneMatrices;
 	}
 
+  Animation* GetAnimation(){
+    return m_CurrentAnimation;
+  }
+
 private:
 	std::vector<glm::mat4> m_FinalBoneMatrices;
-	Animation* m_CurrentAnimation;
-	float m_CurrentTime;
-	float m_DeltaTime;
 
 };

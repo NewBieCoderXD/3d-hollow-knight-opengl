@@ -1,6 +1,9 @@
 #ifndef MODEL_H
 #define MODEL_H
 
+#include "glm/ext/matrix_float4x4.hpp"
+#include "learnopengl/bone.h"
+#include <assimp/anim.h>
 #include <glad/glad.h>
 
 #include <assimp/Importer.hpp>
@@ -20,9 +23,15 @@
 #include <map>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 using namespace std;
+
+struct MeshAnimationChannel {
+  aiNode *node;
+  aiNodeAnim *channel;
+};
 
 class Model {
 public:
@@ -33,6 +42,7 @@ public:
   vector<Mesh> meshes;
   string directory;
   bool gammaCorrection;
+  std::unordered_map<unsigned int, MeshAnimationChannel> meshAnimationCache;
 
   // constructor, expects a filepath to a 3D model.
   Model(string const &path, bool gamma = false) : gammaCorrection(gamma) {
@@ -46,12 +56,76 @@ public:
       return;
     }
     processNode(scene->mRootNode, scene);
+
+    if (scene->mNumAnimations > 0) {
+      aiAnimation *animation =
+          scene->mAnimations[0]; // pick first animation for now
+      BuildMeshAnimationCache(scene, animation);
+    }
+  }
+
+  aiNode *FindNodeForMesh(aiNode *node, unsigned int meshIndex) {
+    for (unsigned int i = 0; i < node->mNumMeshes; i++)
+      if (node->mMeshes[i] == meshIndex)
+        return node;
+    for (unsigned int c = 0; c < node->mNumChildren; c++) {
+      aiNode *found = FindNodeForMesh(node->mChildren[c], meshIndex);
+      if (found)
+        return found;
+    }
+    return nullptr;
+  }
+
+  void BuildMeshAnimationCache(const aiScene *scene,
+                               const aiAnimation *animation) {
+    for (unsigned int meshIndex = 0; meshIndex < scene->mNumMeshes;
+         ++meshIndex) {
+      aiNode *node = FindNodeForMesh(scene->mRootNode, meshIndex);
+      if (!node)
+        continue;
+
+      aiNodeAnim *channel = nullptr;
+      for (unsigned int i = 0; i < animation->mNumChannels; i++) {
+        if (animation->mChannels[i]->mNodeName == node->mName) {
+          channel = animation->mChannels[i];
+          break;
+        }
+      }
+
+      meshAnimationCache[meshIndex] = {node, channel};
+    }
   }
 
   // draws the model, and thus all its meshes
-  void Draw(Shader &shader) {
-    for (unsigned int i = 0; i < meshes.size(); i++)
+  void Draw(glm::mat4 objectModel, Shader &shader, float time) {
+    for (unsigned int i = 0; i < meshes.size(); i++) {
+      MeshAnimationChannel found = meshAnimationCache[i];
+      glm::mat4 meshModel = glm::mat4(1.0f);
+      if (found.channel != nullptr) {
+        glm::vec3 pos = AssimpGLMHelpers::LerpPosition(found.channel, time);
+        glm::quat rot = AssimpGLMHelpers::SlerpRotation(found.channel, time);
+        glm::vec3 scale = AssimpGLMHelpers::LerpScale(found.channel, time);
+        
+        // rot.w=-rot.w;
+        // rot.x=-rot.x;
+        // rot.y=-rot.y;
+        // rot.z=-rot.z;
+        // pos.x = -pos.x;
+        
+        meshModel = glm::translate(meshModel, pos);
+        meshModel *= glm::toMat4(rot);
+        meshModel = glm::scale(meshModel, scale);
+
+        // std::cout<< "w: "<<rot.w << " x: " << rot.x << " x: " << rot.y << "z: " << rot.z << std::endl;
+        // std::cout << "x: " << pos.x << " y: " << pos.y << " z: " << pos.z
+        //           << std::endl;
+      }
+
+      shader.use();
+      shader.setMat4("model", objectModel * meshModel);
+
       meshes[i].Draw(shader);
+    }
   }
 
   auto &GetBoneInfoMap() { return m_BoneInfoMap; }
@@ -244,76 +318,85 @@ private:
     vector<Texture> textures;
     for (unsigned int i = 0; i < mat->GetTextureCount(type); i++) {
       aiString str;
-      mat->GetTexture(type, i, &str);
-      if (str.C_Str()[0] == '*') {
-        // embedded texture
-        int texIndex = atoi(str.C_Str() + 1);
-        aiTexture *tex = scene.mTextures[texIndex];
+      if (mat->GetTexture(type, i, &str) == AI_SUCCESS) {
+        if (str.C_Str()[0] == '*') {
+          // embedded texture
+          int texIndex = atoi(str.C_Str() + 1);
+          aiTexture *tex = scene.mTextures[texIndex];
 
-        int width, height, nrComponents;
-        unsigned char *data = nullptr;
+          int width, height, nrComponents;
+          unsigned char *data = nullptr;
 
-        if (tex->mHeight == 0) {
-          // Compressed texture (PNG/JPG in memory)
-          data =
-              stbi_load_from_memory((unsigned char *)tex->pcData, tex->mWidth,
-                                    &width, &height, &nrComponents, 0);
-        } else {
-          // Raw RGBA
-          width = tex->mWidth;
-          height = tex->mHeight;
-          nrComponents = 4;
-          data = (unsigned char *)tex->pcData;
+          if (tex->mHeight == 0) {
+            // Compressed texture (PNG/JPG in memory)
+            stbi_set_flip_vertically_on_load(true);
+            data =
+                stbi_load_from_memory((unsigned char *)tex->pcData, tex->mWidth,
+                                      &width, &height, &nrComponents, 0);
+          } else {
+            // Raw RGBA
+            width = tex->mWidth;
+            height = tex->mHeight;
+            nrComponents = 4;
+            data = (unsigned char *)tex->pcData;
+          }
+
+          if (!data) {
+            std::cerr << "Failed to load embedded texture: " << str.C_Str()
+                      << std::endl;
+            return {};
+          }
+
+          unsigned int textureID;
+          glGenTextures(1, &textureID);
+
+          GLenum format = (nrComponents == 1)   ? GL_RED
+                          : (nrComponents == 3) ? GL_RGB
+                                                : GL_RGBA;
+
+          glBindTexture(GL_TEXTURE_2D, textureID);
+          glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format,
+                       GL_UNSIGNED_BYTE, data);
+          glGenerateMipmap(GL_TEXTURE_2D);
+
+          glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+          glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+          glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                          GL_LINEAR_MIPMAP_LINEAR);
+          glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+          Texture texture;
+          texture.id = textureID;
+          texture.type = typeName;
+          texture.path = str.C_Str();
+          textures.push_back(texture);
+          textures_loaded.push_back(texture);
+
+          if (tex->mHeight == 0)
+            stbi_image_free(data); // free only if we used stbi
+          continue;
         }
-
-        if (!data) {
-          std::cerr << "Failed to load embedded texture: " << str.C_Str()
-                    << std::endl;
-          return {};
+        // check if texture was loaded before and if so, continue to next
+        // iteration: skip loading a new texture
+        bool skip = false;
+        for (unsigned int j = 0; j < textures_loaded.size(); j++) {
+          if (std::strcmp(textures_loaded[j].path.data(), str.C_Str()) == 0) {
+            textures.push_back(textures_loaded[j]);
+            skip = true; // a texture with the same filepath has already been
+                         // loaded, continue to next one. (optimization)
+            break;
+          }
         }
-
-        unsigned int textureID;
-        glGenTextures(1, &textureID);
-
-        GLenum format = (nrComponents == 1)   ? GL_RED
-                        : (nrComponents == 3) ? GL_RGB
-                                              : GL_RGBA;
-
-        glBindTexture(GL_TEXTURE_2D, textureID);
-        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format,
-                     GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
-                        GL_LINEAR_MIPMAP_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-        if (tex->mHeight == 0)
-          stbi_image_free(data); // free only if we used stbi
-        continue;
-      }
-      // check if texture was loaded before and if so, continue to next
-      // iteration: skip loading a new texture
-      bool skip = false;
-      for (unsigned int j = 0; j < textures_loaded.size(); j++) {
-        if (std::strcmp(textures_loaded[j].path.data(), str.C_Str()) == 0) {
-          textures.push_back(textures_loaded[j]);
-          skip = true; // a texture with the same filepath has already been
-                       // loaded, continue to next one. (optimization)
-          break;
+        if (!skip) { // if texture hasn't been loaded already, load it
+          Texture texture;
+          texture.id = TextureFromFile(str.C_Str(), this->directory);
+          texture.type = typeName;
+          texture.path = str.C_Str();
+          textures.push_back(texture);
+          textures_loaded.push_back(
+              texture); // store it as texture loaded for entire model, to
+                        // ensure we won't unnecessary load duplicate textures.
         }
-      }
-      if (!skip) { // if texture hasn't been loaded already, load it
-        Texture texture;
-        texture.id = TextureFromFile(str.C_Str(), this->directory);
-        texture.type = typeName;
-        texture.path = str.C_Str();
-        textures.push_back(texture);
-        textures_loaded.push_back(
-            texture); // store it as texture loaded for entire model, to ensure
-                      // we won't unnecessary load duplicate textures.
       }
     }
     return textures;

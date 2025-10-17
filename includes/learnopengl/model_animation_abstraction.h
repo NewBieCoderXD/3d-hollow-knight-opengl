@@ -1,4 +1,5 @@
 
+#include "glm/ext/vector_float3.hpp"
 #include "learnopengl/animation.h"
 #include "learnopengl/animator.h"
 #include "learnopengl/model_animation.h"
@@ -9,6 +10,7 @@
 class ModelAnimationAbs {
 public:
   std::unique_ptr<Model> model;
+  glm::vec3 position{0.0f, 0.0f, 0.0f};
   Animator animator;
   const aiScene *scene;
 
@@ -25,6 +27,7 @@ public:
     for (unsigned int i = 0; i < scene->mNumAnimations; i++) {
       aiAnimation *anim = scene->mAnimations[i];
       const char *name = anim->mName.C_Str();
+      std::cout<<"Found action "<<name<<std::endl;
       this->nameToAnimation.insert(
           {string(name), Animation(*scene, anim, this->model.get())});
     }
@@ -33,8 +36,33 @@ public:
   void setAnimation(std::string name) {
     auto animationItr = this->nameToAnimation.find(name);
     if (animationItr != this->nameToAnimation.end()) {
-      this->animator = Animator(&animationItr->second);
+      std::cout<<"playing animation "<<name<<std::endl;
+      this->animator.PlayAnimation(&animationItr->second);
     }
+  }
+
+  void draw(glm::mat4 modelMtx, Shader &shader, float deltaTime) {
+    modelMtx = glm::translate(modelMtx, position);
+
+    float timeInTicks = deltaTime;
+
+    Animation *foundAnim = animator.GetAnimation();
+    if (foundAnim!=nullptr) {
+        float ticksPerSecond = foundAnim->m_TicksPerSecond != 0 
+                               ? foundAnim->m_TicksPerSecond 
+                               : 25.0f;
+
+        // Accumulate animation time internally
+        animator.m_CurrentTime += deltaTime * ticksPerSecond;
+
+        // Wrap around the animation duration
+        timeInTicks = animator.m_CurrentTime;
+        if(animator.m_CurrentTime>foundAnim->m_Duration){
+          animator.m_CurrentAnimation=nullptr;
+        }
+    }
+
+    model->Draw(modelMtx, shader, timeInTicks);
   }
 
 private:

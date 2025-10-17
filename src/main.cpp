@@ -1,6 +1,7 @@
-#include "learnopengl/animation.h"
 #include "learnopengl/model_animation.h"
+#include "learnopengl/plane.h"
 #include <GLFW/glfw3.h>
+#include <cmath>
 #include <glad/glad.h>
 
 #include <glm/glm.hpp>
@@ -16,11 +17,14 @@
 #include <learnopengl/animator.h>
 
 #include <iostream>
+#include <optional>
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
+void mouse_button_callback(GLFWwindow *window, int button, int action,
+                           int mods);
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -35,6 +39,8 @@ bool firstMouse = true;
 // timing
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
+
+std::optional<ModelAnimationAbs> knight;
 
 int main() {
   // glfw: initialize and configure
@@ -65,16 +71,14 @@ int main() {
   // tell GLFW to capture our mouse
   glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
+  glfwSetMouseButtonCallback(window, mouse_button_callback);
+
   // glad: load all OpenGL function pointers
   // ---------------------------------------
   if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
     std::cout << "Failed to initialize GLAD" << std::endl;
     return -1;
   }
-
-  // tell stb_image.h to flip loaded texture's on the y-axis (before loading
-  // model).
-  stbi_set_flip_vertically_on_load(true);
 
   // configure global opengl state
   // -----------------------------
@@ -85,14 +89,22 @@ int main() {
   Shader texturedModelShader("src/texturedModel.vert",
                              "src/texturedModel.frag");
 
+  Shader simple3dShader("src/simple3d.vert", "src/simple3d.frag");
+
   Assimp::Importer importer;
+
+  Plane ground(1.0f);
+  ground.position = glm::vec3(0.0f, 0.0f, 0.0f);
+  ground.rotation = glm::vec3(0.0f);
 
   // load models
   // -----------
-  ModelAnimationAbs knight(importer,
+  // tell stb_image.h to flip loaded texture's on the y-axis (before loading
+  // model).
+  stbi_set_flip_vertically_on_load(false);
+  knight = ModelAnimationAbs(
+      importer,
       "resources/hollow-knight-the-knight/hollow-knight-the-knight.glb");
-  // Model
-  // ourModel("/home/frook/Downloads/hornet_-_hollow_knight_silksong.glb");
 
   // draw in wireframe
   // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -110,6 +122,10 @@ int main() {
     // -----
     processInput(window);
 
+    // glfwSetCursorPos(window, SCR_WIDTH / 2.0f, SCR_HEIGHT / 2.0f);
+    // lastX = SCR_WIDTH / 2.0f;
+    // lastY = SCR_HEIGHT / 2.0f;
+
     // render
     // ------
     glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
@@ -126,27 +142,21 @@ int main() {
     texturedModelShader.setMat4("projection", projection);
     texturedModelShader.setMat4("view", view);
 
+    simple3dShader.use();
+    simple3dShader.setMat4("projection", projection);
+    simple3dShader.setMat4("view", view);
+    ground.Draw(simple3dShader);
+
     // render the loaded model
     glm::mat4 model = glm::mat4(1.0f);
-    model = glm::translate(
-        model,
-        glm::vec3(
-            0.0f, 0.0f,
-            0.0f)); // translate it down so it's at the center of the scene
-    model = glm::scale(
-        model,
-        glm::vec3(1.0f, 1.0f,
-                  1.0f)); // it's a bit too big for our scene, so scale it down
+    model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
+    model =
+        glm::rotate(model, (float)(M_PI / 2.0), glm::vec3(1.0f, 0.0f, 0.0f));
+    model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));
 
-    texturedModelShader.setMat4("model", model);
-    knight.setAnimation("slash");
-    knight.animator.UpdateAnimation(1);
-    knight.model->Draw(texturedModelShader);
+    knight->draw(model, texturedModelShader, deltaTime);
 
-    // ourShader.setMat4("projection", projection);
-    // ourShader.setMat4("view", view);
-    // ourShader.setMat4("model", model);
-    // model1.Draw(ourShader);
+    camera.LookAt = knight->position;
 
     // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved
     // etc.)
@@ -161,6 +171,8 @@ int main() {
   return 0;
 }
 
+void updateCameraFollow() {}
+
 // process all input: query GLFW whether relevant keys are pressed/released this
 // frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
@@ -168,14 +180,39 @@ void processInput(GLFWwindow *window) {
   if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
     glfwSetWindowShouldClose(window, true);
 
+  // if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+  //   camera.ProcessKeyboard(FORWARD, deltaTime);
+  // if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+  //   camera.ProcessKeyboard(BACKWARD, deltaTime);
+  // if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+  //   camera.ProcessKeyboard(LEFT, deltaTime);
+  // if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+  //   camera.ProcessKeyboard(RIGHT, deltaTime);
+
+  float modelSpeed = 1;
+
+  glm::vec3 moveDir(0.0f);
+  glm::vec3 forwardXY =
+      glm::normalize(glm::vec3(camera.Front.x, camera.Front.y, 0));
+  glm::vec3 rightXY =
+      glm::normalize(glm::vec3(camera.Right.x, camera.Right.y, 0.0f));
+
   if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-    camera.ProcessKeyboard(FORWARD, deltaTime);
+    moveDir += forwardXY;
   if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-    camera.ProcessKeyboard(BACKWARD, deltaTime);
+    moveDir -= forwardXY;
   if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-    camera.ProcessKeyboard(LEFT, deltaTime);
+    moveDir -= rightXY;
   if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-    camera.ProcessKeyboard(RIGHT, deltaTime);
+    moveDir += rightXY;
+
+  if (glm::length(moveDir) > 0.0f) {
+    moveDir = glm::normalize(moveDir);
+    knight->position += moveDir * modelSpeed * deltaTime;
+  }
+
+  // update camera to follow
+  updateCameraFollow();
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback
@@ -185,6 +222,13 @@ void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
   // make sure the viewport matches the new window dimensions; note that width
   // and height will be significantly larger than specified on retina displays.
   glViewport(0, 0, width, height);
+}
+
+void mouse_button_callback(GLFWwindow *window, int button, int action,
+                           int mods) {
+  if (button == GLFW_MOUSE_BUTTON_LEFT) {
+    knight->setAnimation("Knight_NailAction");
+  }
 }
 
 // glfw: whenever the mouse moves, this callback is called
@@ -199,14 +243,15 @@ void mouse_callback(GLFWwindow *window, double xposIn, double yposIn) {
     firstMouse = false;
   }
 
-  float xoffset = xpos - lastX;
+  // Calculate offsets based on the change from the last position
+  float xoffset = xpos - lastX; // <--- Use local float declaration here
   float yoffset =
       lastY - ypos; // reversed since y-coordinates go from bottom to top
 
   lastX = xpos;
   lastY = ypos;
 
-  camera.ProcessMouseMovement(xoffset, yoffset);
+  camera.ProcessMouseMovement(xoffset / SCR_WIDTH, yoffset / SCR_HEIGHT);
 }
 
 // glfw: whenever the mouse scroll wheel scrolls, this callback is called
