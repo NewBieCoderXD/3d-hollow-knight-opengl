@@ -5,10 +5,11 @@
     "-I/usr/bin/include",
     "-I/usr/include",
     "-I/usr/include/c++/13",
-    "-I${workspaceFolder}/includes"
+    "-I${workspaceFolder}/includes",
+    "-I${workspaceFolder}/build/vcpkg_installed/x64-linux/include"
   ],
   "C_Cpp.intelliSenseEngine": "disabled",
   "code-runner.executorMap": {
-    "cpp": "cd \"$workspaceRoot\" && cmake -S . -B build && cmake --build build && bin/main"
+    "cpp": "cd \"$workspaceRoot\" && cmake --build build && bin/main"
   }
 }

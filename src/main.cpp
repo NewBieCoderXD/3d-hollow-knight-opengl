@@ -226,7 +226,7 @@ void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
 
 void mouse_button_callback(GLFWwindow *window, int button, int action,
                            int mods) {
-  if (button == GLFW_MOUSE_BUTTON_LEFT) {
+  if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
     knight->setAnimation("Knight_NailAction");
   }
 }
