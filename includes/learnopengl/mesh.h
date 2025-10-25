@@ -9,6 +9,7 @@
 #include <learnopengl/shader.h>
 
 #include <string>
+#include <sys/types.h>
 #include <vector>
 using namespace std;
 
@@ -51,6 +52,15 @@ public:
     this->vertices = vertices;
     this->indices = indices;
     this->textures = textures;
+    // for (uint i = 0; i < this->vertices.size(); i++) {
+    //   for (auto vertex : vertices) {
+    //     std::cout << "x: " << vertex.Position.x << " y: " <<
+    //     vertex.Position.y
+    //               << " z: " << vertex.Position.z << std::endl;
+    //     std::cout << ",\n";
+    //   }
+    //   std::cout << "\n";
+    // }
 
     // now that we have all the required data, set the vertex buffers and its
     // attribute pointers.

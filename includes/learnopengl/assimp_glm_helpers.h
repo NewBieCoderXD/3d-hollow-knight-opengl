@@ -43,6 +43,8 @@ public:
   }
 
   static glm::vec3 LerpPosition(aiNodeAnim *channel, float timeInTicks) {
+    if (channel->mNumPositionKeys == 0)
+      return glm::vec3(0.0f, 0.0f, 0.0f);
     if (channel->mNumPositionKeys == 1)
       return GetGLMVec(channel->mPositionKeys[0].mValue);
 
@@ -72,6 +74,9 @@ public:
   }
 
   static glm::quat SlerpRotation(aiNodeAnim *channel, float animationTime) {
+    if (channel->mNumRotationKeys == 0) {
+      return glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+    }
     if (channel->mNumRotationKeys == 1) {
       // Only one keyframe — just return it
       const aiQuaternion &q = channel->mRotationKeys[0].mValue;
@@ -123,6 +128,8 @@ public:
   }
 
   static glm::vec3 LerpScale(aiNodeAnim *channel, float animationTime) {
+    if (channel->mNumScalingKeys == 0)
+      return glm::vec3(1.0f);
     if (channel->mNumScalingKeys == 1)
       return GetGLMVec(channel->mScalingKeys[0].mValue);
 

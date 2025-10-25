@@ -38,6 +38,7 @@ struct MeshAnimationChannel {
 
 class Model {
 public:
+  std::vector<glm::mat4> meshNodeTransforms;
   // model data
   vector<Texture>
       textures_loaded; // stores all the textures loaded so far, optimization to
@@ -45,7 +46,7 @@ public:
   vector<Mesh> meshes;
   string directory;
   bool gammaCorrection;
-  std::unordered_map<unsigned int, MeshAnimationChannel> meshAnimationCache;
+  std::vector<MeshAnimationChannel> meshAnimationCache;
 
   // constructor, expects a filepath to a 3D model.
   Model(string const &path, bool gamma = false) : gammaCorrection(gamma) {
@@ -59,6 +60,9 @@ public:
       return;
     }
     processNode(scene->mRootNode, scene);
+    std::cout << "Number of meshes: " << meshes.size() << std::endl;
+
+    meshAnimationCache.resize(meshes.size());
 
     if (scene->mNumAnimations > 0) {
       aiAnimation *animation =
@@ -95,17 +99,19 @@ public:
         }
       }
 
-      meshAnimationCache[meshIndex] = {
-          node, channel,
-          AssimpGLMHelpers::ConvertMatrixToGLMFormat(node->mTransformation)};
+      glm::mat4 transform =
+          AssimpGLMHelpers::ConvertMatrixToGLMFormat(node->mTransformation);
+
+      meshAnimationCache[meshIndex] = {node, channel, transform};
     }
   }
 
   // draws the model, and thus all its meshes
   void Draw(glm::mat4 objectModel, Shader &shader, float time) {
     for (unsigned int i = 0; i < meshes.size(); i++) {
+      glm::mat4 transform = meshNodeTransforms[i];
+
       MeshAnimationChannel found = meshAnimationCache[i];
-      glm::mat4 transform = found.mTransform;
       glm::mat4 animTransform = glm::mat4(1.0f);
       if (found.channel != nullptr) {
         glm::vec3 pos = AssimpGLMHelpers::LerpPosition(found.channel, time);
@@ -128,9 +134,10 @@ public:
         glm::mat4 rotMat = glm::toMat4(rot);
         animTransform *= glm::toMat4(rot);
         animTransform = glm::scale(animTransform, scale);
-        transform = animTransform;
+        transform *= animTransform;
       }
       shader.use();
+      // std::cout << glm::to_string(found.mTransform) << std::endl;
       shader.setMat4("model", objectModel * transform);
 
       meshes[i].Draw(shader);
@@ -169,7 +176,11 @@ private:
   // processes a node in a recursive fashion. Processes each individual mesh
   // located at the node and repeats this process on its children nodes (if
   // any).
-  void processNode(aiNode *node, const aiScene *scene) {
+  void processNode(aiNode *node, const aiScene *scene,
+                   const glm::mat4 &parentTransform = glm::mat4(1.0f)) {
+    glm::mat4 nodeTransform =
+        parentTransform *
+        AssimpGLMHelpers::ConvertMatrixToGLMFormat(node->mTransformation);
     // process each mesh located at the current node
     for (unsigned int i = 0; i < node->mNumMeshes; i++) {
       // the node object only contains indices to index the actual objects in
@@ -177,11 +188,12 @@ private:
       // organized (like relations between nodes).
       aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
       meshes.push_back(processMesh(mesh, scene));
+      meshNodeTransforms.push_back(nodeTransform);
     }
     // after we've processed all of the meshes (if any) we then recursively
     // process each of the children nodes
     for (unsigned int i = 0; i < node->mNumChildren; i++) {
-      processNode(node->mChildren[i], scene);
+      processNode(node->mChildren[i], scene, nodeTransform);
     }
   }
 
@@ -328,6 +340,7 @@ private:
     for (unsigned int i = 0; i < mat->GetTextureCount(type); i++) {
       aiString str;
       if (mat->GetTexture(type, i, &str) == AI_SUCCESS) {
+        std::cout << "Found texture: " << str.C_Str() << std::endl;
         if (str.C_Str()[0] == '*') {
           // embedded texture
           int texIndex = atoi(str.C_Str() + 1);

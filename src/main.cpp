@@ -41,6 +41,7 @@ float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
 std::optional<ModelAnimationAbs> knight;
+std::optional<ModelAnimationAbs> hornet;
 
 int main() {
   // glfw: initialize and configure
@@ -97,8 +98,6 @@ int main() {
 
   Shader simple3dShader("src/simple3d.vert", "src/simple3d.frag");
 
-  Assimp::Importer importer;
-
   Plane ground(1.0f);
   ground.position = glm::vec3(0.0f, 0.0f, 0.0f);
   ground.rotation = glm::vec3(0.0f);
@@ -108,9 +107,14 @@ int main() {
   // tell stb_image.h to flip loaded texture's on the y-axis (before loading
   // model).
   stbi_set_flip_vertically_on_load(false);
-  knight = ModelAnimationAbs(
-      importer,
-      "resources/hollow-knight-the-knight/hollow-knight-the-knight-v3.glb");
+
+  Assimp::Importer knightImporter;
+  knight = ModelAnimationAbs(knightImporter,
+                             "resources/hollow-knight-the-knight.glb");
+
+  Assimp::Importer hornetImporter;
+  hornet =
+      ModelAnimationAbs(hornetImporter, "resources/hollow_knight_hornet.glb");
 
   // draw in wireframe
   // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -155,14 +159,12 @@ int main() {
 
     // render the loaded model
     glm::mat4 model = glm::mat4(1.0f);
-    model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
-    // model =
-    //     glm::rotate(model, (float)(M_PI / 2.0), glm::vec3(1.0f, 0.0f, 0.0f));
-    model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));
+    // knight->draw(model, texturedModelShader, deltaTime);
 
-    knight->draw(model, texturedModelShader, deltaTime);
+    model = glm::mat4(1.0f);
+    hornet->draw(model, texturedModelShader, deltaTime);
 
-    camera.LookAt = knight->position;
+    // camera.LookAt = knight->position;
 
     // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved
     // etc.)

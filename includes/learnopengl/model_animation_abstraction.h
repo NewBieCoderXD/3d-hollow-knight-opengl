@@ -21,6 +21,7 @@ public:
         importer.ReadFile(FileSystem::getPath(path),
                           aiProcess_Triangulate | aiProcess_GenSmoothNormals |
                               aiProcess_CalcTangentSpace);
+    std::cout << "Loading model: " << path << std::endl;
     this->model = std::make_unique<Model>(
         Model(scene, path.substr(0, path.find_last_of('/')), false));
 
@@ -62,7 +63,6 @@ public:
         animator.m_CurrentAnimation = nullptr;
       }
     }
-
     model->Draw(modelMtx, shader, timeInTicks);
   }
 
