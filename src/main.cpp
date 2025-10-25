@@ -1,3 +1,4 @@
+#include "glm/geometric.hpp"
 #include "learnopengl/model_animation.h"
 #include "learnopengl/plane.h"
 #include <GLFW/glfw3.h>
@@ -40,8 +41,24 @@ bool firstMouse = true;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
+float DAMAGE_COOLDOWN = 0.5f;
+float lastHit = 0.0f;
+
 std::optional<ModelAnimationAbs> knight;
 std::optional<ModelAnimationAbs> hornet;
+
+bool CheckCollision(ModelAnimationAbs &one,
+                    ModelAnimationAbs &two) // AABB - AABB collision
+{
+  // collision x-axis?
+  bool collisionX = one.position.x + one.width >= two.position.x &&
+                    two.position.x + two.width >= one.position.x;
+  // collision y-axis?
+  bool collisionY = one.position.y + one.height >= two.position.y &&
+                    two.position.y + two.height >= one.position.y;
+  // collision only if on both axes
+  return collisionX && collisionY;
+}
 
 int main() {
   // glfw: initialize and configure
@@ -115,8 +132,10 @@ int main() {
   Assimp::Importer hornetImporter;
   hornet = ModelAnimationAbs(
       hornetImporter, "resources/hollow-knight-hornet/source/hornet.glb");
-  hornet->position.x = 2.0f;
+  hornet->position.x = 3.0f;
   hornet->scale = 2.5f;
+
+  GLint isHitLocation = glGetUniformLocation(texturedModelShader.ID, "isHit");
 
   // draw in wireframe
   // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -159,12 +178,28 @@ int main() {
     simple3dShader.setMat4("view", view);
     ground.Draw(simple3dShader);
 
+    if (lastFrame < DAMAGE_COOLDOWN + lastHit) {
+      glUniform1i(isHitLocation, true);
+    } else {
+      glUniform1i(isHitLocation, false);
+    }
+
     // render the loaded model
     glm::mat4 model = glm::mat4(1.0f);
     knight->draw(model, texturedModelShader, deltaTime);
 
+    glUniform1i(isHitLocation, false);
+
     model = glm::mat4(1.0f);
     hornet->draw(model, texturedModelShader, deltaTime);
+
+    if (CheckCollision(*knight, *hornet) &&
+        lastFrame > DAMAGE_COOLDOWN + lastHit) {
+      knight->position +=
+          glm::normalize(knight->position - hornet->position) * 1.0f;
+      std::cout << "COLLISIONSS " << lastFrame << std::endl;
+      lastHit = lastFrame;
+    }
 
     // camera.LookAt = knight->position;
 

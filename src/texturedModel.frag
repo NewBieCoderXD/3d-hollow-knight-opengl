@@ -11,8 +11,14 @@ uniform sampler2D texture_diffuse1;
 uniform sampler2D texture_base_color1;
 uniform vec3 uBaseColor = vec3(0.0);
 
+uniform bool isHit = false;
+
 void main()
 {
+    if(isHit){
+      FragColor=vec4(1.0);
+      return;
+    }
     // Sample diffuse texture first
     vec3 color = texture(texture_diffuse1, TexCoords).rgb;
 
