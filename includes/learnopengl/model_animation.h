@@ -155,7 +155,6 @@ public:
         animTransform = glm::scale(animTransform, scale);
         transform = animTransform;
       }
-      shader.use();
       // std::cout << glm::to_string(found.mTransform) << std::endl;
       shader.setMat4("model", objectModel * transform);
 

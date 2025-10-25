@@ -11,7 +11,7 @@ uniform sampler2D texture_diffuse1;
 uniform sampler2D texture_base_color1;
 uniform vec3 uBaseColor = vec3(0.0);
 
-uniform bool isHit = false;
+uniform bool isHit = true;
 
 void main()
 {

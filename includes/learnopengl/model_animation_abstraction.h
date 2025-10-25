@@ -1,4 +1,5 @@
 
+#include "../constants.cpp"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/ext/vector_float3.hpp"
 #include "learnopengl/animation.h"
@@ -17,6 +18,7 @@ public:
   float scale = 1.0f;
   float width;
   float height;
+  float lastHit;
 
   Animator animator;
   const aiScene *scene;
@@ -71,7 +73,17 @@ public:
     }
   }
 
-  void draw(glm::mat4 modelMtx, Shader &shader, float deltaTime) {
+  void draw(glm::mat4 modelMtx, Shader &shader, float deltaTime,
+            float lastFrame) {
+    GLint isHitLocation = glGetUniformLocation(shader.ID, "isHit");
+
+    shader.use();
+    if (lastFrame < DAMAGE_EFFECT + lastHit) {
+      glUniform1i(isHitLocation, true);
+    } else {
+      glUniform1i(isHitLocation, false);
+    }
+
     modelMtx = glm::translate(modelMtx, position);
     modelMtx *= glm::toMat4(rotation);
     modelMtx = glm::scale(modelMtx, glm::vec3(scale));
