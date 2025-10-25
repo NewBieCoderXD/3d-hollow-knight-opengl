@@ -59,6 +59,12 @@ int main() {
   GLFWwindow *window =
       glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
   if (window == NULL) {
+    const char *description;
+    int code = glfwGetError(&description);
+    if (description) {
+      // Log or print the error code and description
+      printf("GLFW Error %d: %s\n", code, description);
+    }
     std::cout << "Failed to create GLFW window" << std::endl;
     glfwTerminate();
     return -1;
@@ -104,7 +110,7 @@ int main() {
   stbi_set_flip_vertically_on_load(false);
   knight = ModelAnimationAbs(
       importer,
-      "resources/hollow-knight-the-knight/hollow-knight-the-knight.glb");
+      "resources/hollow-knight-the-knight/hollow-knight-the-knight-v3.glb");
 
   // draw in wireframe
   // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -150,8 +156,8 @@ int main() {
     // render the loaded model
     glm::mat4 model = glm::mat4(1.0f);
     model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
-    model =
-        glm::rotate(model, (float)(M_PI / 2.0), glm::vec3(1.0f, 0.0f, 0.0f));
+    // model =
+    //     glm::rotate(model, (float)(M_PI / 2.0), glm::vec3(1.0f, 0.0f, 0.0f));
     model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));
 
     knight->draw(model, texturedModelShader, deltaTime);

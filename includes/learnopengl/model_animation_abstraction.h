@@ -27,7 +27,7 @@ public:
     for (unsigned int i = 0; i < scene->mNumAnimations; i++) {
       aiAnimation *anim = scene->mAnimations[i];
       const char *name = anim->mName.C_Str();
-      std::cout<<"Found action "<<name<<std::endl;
+      std::cout << "Found action " << name << std::endl;
       this->nameToAnimation.insert(
           {string(name), Animation(*scene, anim, this->model.get())});
     }
@@ -36,7 +36,7 @@ public:
   void setAnimation(std::string name) {
     auto animationItr = this->nameToAnimation.find(name);
     if (animationItr != this->nameToAnimation.end()) {
-      std::cout<<"playing animation "<<name<<std::endl;
+      std::cout << "playing animation " << name << std::endl;
       this->animator.PlayAnimation(&animationItr->second);
     }
   }
@@ -47,19 +47,20 @@ public:
     float timeInTicks = deltaTime;
 
     Animation *foundAnim = animator.GetAnimation();
-    if (foundAnim!=nullptr) {
-        float ticksPerSecond = foundAnim->m_TicksPerSecond != 0 
-                               ? foundAnim->m_TicksPerSecond 
-                               : 25.0f;
+    if (foundAnim != nullptr) {
+      float ticksPerSecond = foundAnim->m_TicksPerSecond != 0
+                                 ? foundAnim->m_TicksPerSecond
+                                 : 25.0f;
+      // float ticksPerSecond = 50.0f;
 
-        // Accumulate animation time internally
-        animator.m_CurrentTime += deltaTime * ticksPerSecond;
+      // Accumulate animation time internally
+      animator.m_CurrentTime += deltaTime * ticksPerSecond;
 
-        // Wrap around the animation duration
-        timeInTicks = animator.m_CurrentTime;
-        if(animator.m_CurrentTime>foundAnim->m_Duration){
-          animator.m_CurrentAnimation=nullptr;
-        }
+      // Wrap around the animation duration
+      timeInTicks = animator.m_CurrentTime;
+      if (animator.m_CurrentTime > foundAnim->m_Duration) {
+        animator.m_CurrentAnimation = nullptr;
+      }
     }
 
     model->Draw(modelMtx, shader, timeInTicks);

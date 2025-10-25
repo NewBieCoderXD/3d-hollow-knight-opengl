@@ -2,6 +2,7 @@
 #define MODEL_H
 
 #include "glm/ext/matrix_float4x4.hpp"
+#include "glm/fwd.hpp"
 #include "learnopengl/bone.h"
 #include <assimp/anim.h>
 #include <glad/glad.h>
@@ -17,6 +18,7 @@
 #include <learnopengl/shader.h>
 
 #include <fstream>
+#include <glm/gtx/string_cast.hpp> // For glm::to_string
 #include <iostream>
 #include <learnopengl/animdata.h>
 #include <learnopengl/assimp_glm_helpers.h>
@@ -31,6 +33,7 @@ using namespace std;
 struct MeshAnimationChannel {
   aiNode *node;
   aiNodeAnim *channel;
+  glm::mat4 mTransform;
 };
 
 class Model {
@@ -92,7 +95,9 @@ public:
         }
       }
 
-      meshAnimationCache[meshIndex] = {node, channel};
+      meshAnimationCache[meshIndex] = {
+          node, channel,
+          AssimpGLMHelpers::ConvertMatrixToGLMFormat(node->mTransformation)};
     }
   }
 
@@ -100,29 +105,33 @@ public:
   void Draw(glm::mat4 objectModel, Shader &shader, float time) {
     for (unsigned int i = 0; i < meshes.size(); i++) {
       MeshAnimationChannel found = meshAnimationCache[i];
-      glm::mat4 meshModel = glm::mat4(1.0f);
+      glm::mat4 transform = found.mTransform;
+      glm::mat4 animTransform = glm::mat4(1.0f);
       if (found.channel != nullptr) {
         glm::vec3 pos = AssimpGLMHelpers::LerpPosition(found.channel, time);
         glm::quat rot = AssimpGLMHelpers::SlerpRotation(found.channel, time);
         glm::vec3 scale = AssimpGLMHelpers::LerpScale(found.channel, time);
-        
-        // rot.w=-rot.w;
-        // rot.x=-rot.x;
-        // rot.y=-rot.y;
-        // rot.z=-rot.z;
-        // pos.x = -pos.x;
-        
-        meshModel = glm::translate(meshModel, pos);
-        meshModel *= glm::toMat4(rot);
-        meshModel = glm::scale(meshModel, scale);
 
-        // std::cout<< "w: "<<rot.w << " x: " << rot.x << " x: " << rot.y << "z: " << rot.z << std::endl;
-        // std::cout << "x: " << pos.x << " y: " << pos.y << " z: " << pos.z
-        //           << std::endl;
+        // float oldY = pos.y;
+        // pos.y = pos.z;
+        // pos.z = oldY;
+
+        // float oldY = rot.y;
+        // rot.y = rot.z;
+        // rot.z = oldY;
+
+        // glm::quat correction =
+        //     glm::angleAxis(glm::radians(-90.0f), glm::vec3(1, 0, 0));
+        // rot = correction * rot;
+
+        animTransform = glm::translate(animTransform, pos);
+        glm::mat4 rotMat = glm::toMat4(rot);
+        animTransform *= glm::toMat4(rot);
+        animTransform = glm::scale(animTransform, scale);
+        transform = animTransform;
       }
-
       shader.use();
-      shader.setMat4("model", objectModel * meshModel);
+      shader.setMat4("model", objectModel * transform);
 
       meshes[i].Draw(shader);
     }

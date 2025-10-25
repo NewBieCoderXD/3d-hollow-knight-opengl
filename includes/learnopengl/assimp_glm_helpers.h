@@ -1,11 +1,13 @@
 #pragma once
 
+#include "glm/fwd.hpp"
 #include <assimp/anim.h>
 #include <assimp/matrix4x4.h>
 #include <assimp/quaternion.h>
 #include <assimp/vector3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <iostream>
 
 class AssimpGLMHelpers {
 public:
@@ -40,85 +42,83 @@ public:
                      pOrientation.z);
   }
 
-  static glm::vec3 LerpPosition(aiNodeAnim *channel, float animationTime) {
+  static glm::vec3 LerpPosition(aiNodeAnim *channel, float timeInTicks) {
     if (channel->mNumPositionKeys == 1)
       return GetGLMVec(channel->mPositionKeys[0].mValue);
 
     // Find the two keyframes surrounding animationTime
     unsigned int index = 0;
     for (unsigned int i = 0; i < channel->mNumPositionKeys - 1; i++) {
-      if (animationTime < (float)channel->mPositionKeys[i + 1].mTime) {
+      if (timeInTicks < (float)channel->mPositionKeys[i + 1].mTime) {
         index = i;
         break;
       }
     }
 
-    unsigned int nextIndex = index + 1;
-    float deltaTime = (float)(channel->mPositionKeys[nextIndex].mTime -
-                              channel->mPositionKeys[index].mTime);
-    float factor =
-        (animationTime - (float)channel->mPositionKeys[index].mTime) /
-        deltaTime;
-
     glm::vec3 start = GetGLMVec(channel->mPositionKeys[index].mValue);
-    glm::vec3 end = GetGLMVec(channel->mPositionKeys[nextIndex].mValue);
 
-    return glm::mix(start, end, factor);
+    return start;
+    // unsigned int nextIndex = index + 1;
+    // float deltaTime = (float)(channel->mPositionKeys[nextIndex].mTime -
+    //                           channel->mPositionKeys[index].mTime);
+    // float factor =
+    //     (animationTime - (float)channel->mPositionKeys[index].mTime) /
+    //     deltaTime;
+
+    // glm::vec3 start = GetGLMVec(channel->mPositionKeys[index].mValue);
+    // glm::vec3 end = GetGLMVec(channel->mPositionKeys[nextIndex].mValue);
+
+    // return glm::mix(start, end, factor);
   }
 
   static glm::quat SlerpRotation(aiNodeAnim *channel, float animationTime) {
-    // no rotation keys -> identity
-    if (channel->mNumRotationKeys == 0)
-      return glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+    if (channel->mNumRotationKeys == 1) {
+      // Only one keyframe — just return it
+      const aiQuaternion &q = channel->mRotationKeys[0].mValue;
+      return glm::quat(q.w, q.x, q.y, q.z);
+    }
 
-    // only one key -> return it
-    if (channel->mNumRotationKeys == 1)
-      return glm::normalize(GetGLMQuat(channel->mRotationKeys[0].mValue));
-
-    // if animationTime is before first key, return first key
-    double firstTime = channel->mRotationKeys[0].mTime;
-    double lastTime =
-        channel->mRotationKeys[channel->mNumRotationKeys - 1].mTime;
-    if (animationTime <= (float)firstTime)
-      return glm::normalize(GetGLMQuat(channel->mRotationKeys[0].mValue));
-    if (animationTime >= (float)lastTime)
-      return glm::normalize(GetGLMQuat(
-          channel->mRotationKeys[channel->mNumRotationKeys - 1].mValue));
-
-    // find the interval [index, nextIndex] such that key[index].time <=
-    // animationTime < key[nextIndex].time
-    unsigned int index = 0;
-    for (unsigned int i = 0; i < channel->mNumRotationKeys - 1; ++i) {
-      double t0 = channel->mRotationKeys[i].mTime;
-      double t1 = channel->mRotationKeys[i + 1].mTime;
-      if (animationTime >= (float)t0 && animationTime < (float)t1) {
-        index = i;
+    // Find the two keyframes between which we will interpolate
+    unsigned int rotationIndex = 0;
+    for (unsigned int i = 0; i < channel->mNumRotationKeys - 1; i++) {
+      if (animationTime <
+          static_cast<float>(channel->mRotationKeys[i + 1].mTime)) {
+        rotationIndex = i;
         break;
       }
     }
 
-    unsigned int nextIndex = index + 1;
-    float t0 = (float)channel->mRotationKeys[index].mTime;
-    float t1 = (float)channel->mRotationKeys[nextIndex].mTime;
-    float delta = t1 - t0;
+    // aiQuaternion rot = channel->mRotationKeys[rotationIndex].mValue;
 
-    // safety: if delta is zero, return the start key
-    if (delta <= 0.0f)
-      return glm::normalize(GetGLMQuat(channel->mRotationKeys[index].mValue));
+    // return glm::quat(rot.w, rot.x, rot.y, rot.z);
 
-    float factor = (animationTime - t0) / delta;
+    unsigned int nextRotationIndex = rotationIndex + 1;
+    float deltaTime =
+        static_cast<float>(channel->mRotationKeys[nextRotationIndex].mTime -
+                           channel->mRotationKeys[rotationIndex].mTime);
+
+    // Avoid divide by zero if deltaTime is extremely small
+    float factor = (deltaTime > 0.0f)
+                       ? (animationTime -
+                          static_cast<float>(
+                              channel->mRotationKeys[rotationIndex].mTime)) /
+                             deltaTime
+                       : 0.0f;
+
+    // Clamp interpolation factor to [0, 1]
     factor = glm::clamp(factor, 0.0f, 1.0f);
 
-    glm::quat qStart =
-        glm::normalize(GetGLMQuat(channel->mRotationKeys[index].mValue));
-    glm::quat qEnd =
-        glm::normalize(GetGLMQuat(channel->mRotationKeys[nextIndex].mValue));
+    // Get start and end rotations
+    const aiQuaternion &startQ = channel->mRotationKeys[rotationIndex].mValue;
+    const aiQuaternion &endQ = channel->mRotationKeys[nextRotationIndex].mValue;
 
-    // ensure shortest path: if dot < 0, negate end quaternion
-    if (glm::dot(qStart, qEnd) < 0.0f)
-      qEnd = -qEnd;
+    // Convert to glm::quat
+    glm::quat start = glm::quat(startQ.w, startQ.x, startQ.y, startQ.z);
+    glm::quat end = glm::quat(endQ.w, endQ.x, endQ.y, endQ.z);
 
-    glm::quat result = glm::slerp(qStart, qEnd, factor);
+    // Spherical linear interpolation (slerp)
+    glm::quat result = glm::slerp(start, end, factor);
+
     return glm::normalize(result);
   }
 
