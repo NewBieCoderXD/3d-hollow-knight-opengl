@@ -1,10 +1,12 @@
 #ifndef CAMERA_H
 #define CAMERA_H
 
+#include "glm/ext/quaternion_trigonometric.hpp"
 #include "glm/trigonometric.hpp"
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <iostream>
 
 // Defines several possible options for camera movement. Used as abstraction to
@@ -30,6 +32,9 @@ public:
   glm::vec3 Right;
   glm::vec3 WorldUp;
   // euler Angles
+
+  glm::vec3 KnightFront;
+
   float Yaw;
   float Pitch;
   // camera options
@@ -49,6 +54,7 @@ public:
     WorldUp = up;
     Yaw = yaw;
     Pitch = pitch;
+    KnightFront = glm::vec3(0.0f, 0.0f, 1.0f); // initial knight facing +Z
     updateCameraVectors();
   }
   // constructor with scalar values
@@ -60,6 +66,7 @@ public:
     WorldUp = glm::vec3(upX, upY, upZ);
     Yaw = yaw;
     Pitch = pitch;
+    KnightFront = glm::vec3(0.0f, 0.0f, 1.0f); // initial knight facing +Z
     updateCameraVectors();
   }
 
@@ -118,15 +125,19 @@ public:
 private:
   // calculates the front vector from the Camera's (updated) Euler Angles
   void updateCameraVectors() {
-    float cameraDistance = distance;
     float radYaw = glm::radians(Yaw);
     float radPitch = glm::radians(Pitch);
 
-    float x = cameraDistance * cos(radPitch) * cos(radYaw);
-    float y = cameraDistance * sin(radPitch);
-    float z = cameraDistance * cos(radPitch) * sin(radYaw);
+    float x = distance * cos(radPitch) * cos(radYaw);
+    float y = distance * sin(radPitch);
+    float z = distance * cos(radPitch) * sin(radYaw);
 
-    Position = LookAt + glm::vec3(x, y, z);
+    glm::vec3 offset = glm::vec3(x, y, z);
+
+    Position = LookAt + offset;
+    Front = glm::normalize(LookAt - Position);
+    Right = glm::normalize(glm::cross(Front, WorldUp));
+    Up = glm::normalize(glm::cross(Right, Front));
   }
 };
 #endif

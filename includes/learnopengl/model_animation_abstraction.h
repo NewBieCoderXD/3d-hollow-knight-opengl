@@ -1,7 +1,9 @@
 
+#include "glm/ext/matrix_transform.hpp"
 #include "glm/ext/vector_float3.hpp"
 #include "learnopengl/animation.h"
 #include "learnopengl/animator.h"
+#include "learnopengl/bone.h"
 #include "learnopengl/model_animation.h"
 #include <assimp/Importer.hpp>
 #include <learnopengl/filesystem.h>
@@ -11,6 +13,8 @@ class ModelAnimationAbs {
 public:
   std::unique_ptr<Model> model;
   glm::vec3 position{0.0f, 0.0f, 0.0f};
+  glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
+  float scale = 1.0f;
   Animator animator;
   const aiScene *scene;
 
@@ -44,6 +48,8 @@ public:
 
   void draw(glm::mat4 modelMtx, Shader &shader, float deltaTime) {
     modelMtx = glm::translate(modelMtx, position);
+    modelMtx *= glm::toMat4(rotation);
+    modelMtx = glm::scale(modelMtx, glm::vec3(scale));
 
     float timeInTicks = deltaTime;
 
@@ -64,6 +70,17 @@ public:
       }
     }
     model->Draw(modelMtx, shader, timeInTicks);
+  }
+
+  glm::vec3 getFront() {
+    // The local forward vector (model-space)
+    glm::vec3 localForward = glm::vec3(0.0f, 0.0f, 1.0f);
+
+    // Rotate it by the quaternion to get world-space forward
+    glm::vec3 worldForward = rotation * localForward;
+
+    // Ensure it is normalized
+    return glm::normalize(worldForward);
   }
 
 private:

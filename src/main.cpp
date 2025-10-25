@@ -113,8 +113,10 @@ int main() {
                              "resources/hollow-knight-the-knight.glb");
 
   Assimp::Importer hornetImporter;
-  hornet =
-      ModelAnimationAbs(hornetImporter, "resources/hollow_knight_hornet.glb");
+  hornet = ModelAnimationAbs(
+      hornetImporter, "resources/hollow-knight-hornet/source/hornet.glb");
+  hornet->position.x = 2.0f;
+  hornet->scale = 2.5f;
 
   // draw in wireframe
   // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -159,7 +161,7 @@ int main() {
 
     // render the loaded model
     glm::mat4 model = glm::mat4(1.0f);
-    // knight->draw(model, texturedModelShader, deltaTime);
+    knight->draw(model, texturedModelShader, deltaTime);
 
     model = glm::mat4(1.0f);
     hornet->draw(model, texturedModelShader, deltaTime);
@@ -188,39 +190,37 @@ void processInput(GLFWwindow *window) {
   if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
     glfwSetWindowShouldClose(window, true);
 
-  // if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-  //   camera.ProcessKeyboard(FORWARD, deltaTime);
-  // if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-  //   camera.ProcessKeyboard(BACKWARD, deltaTime);
-  // if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-  //   camera.ProcessKeyboard(LEFT, deltaTime);
-  // if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-  //   camera.ProcessKeyboard(RIGHT, deltaTime);
-
   float modelSpeed = 1;
 
   glm::vec3 moveDir(0.0f);
   glm::vec3 forwardXY =
-      glm::normalize(glm::vec3(camera.Front.x, camera.Front.y, 0));
+      glm::normalize(glm::vec3(camera.Front.x, 0, camera.Front.z));
   glm::vec3 rightXY =
-      glm::normalize(glm::vec3(camera.Right.x, camera.Right.y, 0.0f));
+      glm::normalize(glm::vec3(camera.Right.x, 0, camera.Right.z));
 
-  if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+  if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
     moveDir += forwardXY;
-  if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+  }
+  if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
     moveDir -= forwardXY;
-  if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+  }
+  if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
     moveDir -= rightXY;
-  if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+  }
+  if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
     moveDir += rightXY;
-
-  if (glm::length(moveDir) > 0.0f) {
-    moveDir = glm::normalize(moveDir);
-    knight->position += moveDir * modelSpeed * deltaTime;
   }
 
-  // update camera to follow
-  updateCameraFollow();
+  if (glm::length(moveDir) > 0.001f) {
+    moveDir = glm::normalize(moveDir);
+    knight->position += moveDir * modelSpeed * deltaTime;
+
+    knight->rotation = glm::rotation(glm::vec3(0, 0, 1), moveDir);
+
+    camera.KnightFront = moveDir;
+  }
+
+  camera.LookAt = knight->position;
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback

@@ -35,6 +35,25 @@ struct MeshAnimationChannel {
   aiNodeAnim *channel;
   glm::mat4 mTransform;
 };
+static const std::vector<std::pair<aiTextureType, std::string>> textureTypes = {
+    {aiTextureType_DIFFUSE, "texture_diffuse"},
+    {aiTextureType_SPECULAR, "texture_specular"},
+    {aiTextureType_AMBIENT, "texture_ambient"},
+    {aiTextureType_EMISSIVE, "texture_emissive"},
+    {aiTextureType_HEIGHT, "texture_height"},
+    {aiTextureType_NORMALS, "texture_normal"},
+    {aiTextureType_SHININESS, "texture_shininess"},
+    {aiTextureType_OPACITY, "texture_opacity"},
+    {aiTextureType_DISPLACEMENT, "texture_displacement"},
+    {aiTextureType_LIGHTMAP, "texture_lightmap"},
+    {aiTextureType_REFLECTION, "texture_reflection"},
+    {aiTextureType_BASE_COLOR, "texture_base_color"},
+    {aiTextureType_NORMAL_CAMERA, "texture_normal_camera"},
+    {aiTextureType_EMISSION_COLOR, "texture_emission_color"},
+    {aiTextureType_METALNESS, "texture_metalness"},
+    {aiTextureType_DIFFUSE_ROUGHNESS, "texture_diffuse_roughness"},
+    {aiTextureType_AMBIENT_OCCLUSION, "texture_ambient_occlusion"},
+    {aiTextureType_UNKNOWN, "texture_unknown"}};
 
 class Model {
 public:
@@ -134,12 +153,13 @@ public:
         glm::mat4 rotMat = glm::toMat4(rot);
         animTransform *= glm::toMat4(rot);
         animTransform = glm::scale(animTransform, scale);
-        transform *= animTransform;
+        transform = animTransform;
       }
       shader.use();
       // std::cout << glm::to_string(found.mTransform) << std::endl;
       shader.setMat4("model", objectModel * transform);
 
+      // std::cout << "name " << meshes[i].name << std::endl;
       meshes[i].Draw(shader);
     }
   }
@@ -230,24 +250,53 @@ private:
       for (unsigned int j = 0; j < face.mNumIndices; j++)
         indices.push_back(face.mIndices[j]);
     }
-    aiMaterial *material = scene->mMaterials[mesh->mMaterialIndex];
+    aiMaterial *aiMaterial = scene->mMaterials[mesh->mMaterialIndex];
+    Material material;
 
-    vector<Texture> diffuseMaps = loadMaterialTextures(
-        *scene, material, aiTextureType_DIFFUSE, "texture_diffuse");
-    textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
-    vector<Texture> specularMaps = loadMaterialTextures(
-        *scene, material, aiTextureType_SPECULAR, "texture_specular");
-    textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
-    std::vector<Texture> normalMaps = loadMaterialTextures(
-        *scene, material, aiTextureType_HEIGHT, "texture_normal");
-    textures.insert(textures.end(), normalMaps.begin(), normalMaps.end());
-    std::vector<Texture> heightMaps = loadMaterialTextures(
-        *scene, material, aiTextureType_AMBIENT, "texture_height");
-    textures.insert(textures.end(), heightMaps.begin(), heightMaps.end());
+    // --- Load material colors ---
+    aiMaterial->Get(AI_MATKEY_COLOR_DIFFUSE, material.diffuse);
+    aiMaterial->Get(AI_MATKEY_COLOR_SPECULAR, material.specular);
+    aiMaterial->Get(AI_MATKEY_COLOR_EMISSIVE, material.emissive);
+
+    aiMaterial->Get(AI_MATKEY_SHININESS, material.shininess);
+    aiMaterial->Get(AI_MATKEY_ROUGHNESS_FACTOR, material.roughness);
+    aiMaterial->Get(AI_MATKEY_METALLIC_FACTOR, material.metallic);
+    aiMaterial->Get(AI_MATKEY_OPACITY, material.opacity);
+
+    // vector<Texture> diffuseMaps = loadMaterialTextures(
+    //     *scene, material, aiTextureType_DIFFUSE, "texture_diffuse");
+    // textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
+    // vector<Texture> specularMaps = loadMaterialTextures(
+    //     *scene, material, aiTextureType_SPECULAR, "texture_specular");
+    // textures.insert(textures.end(), specularMaps.begin(),
+    // specularMaps.end()); std::vector<Texture> normalMaps =
+    // loadMaterialTextures(
+    //     *scene, material, aiTextureType_HEIGHT, "texture_normal");
+    // textures.insert(textures.end(), normalMaps.begin(), normalMaps.end());
+    // std::vector<Texture> heightMaps = loadMaterialTextures(
+    //     *scene, material, aiTextureType_AMBIENT, "texture_height");
+    // textures.insert(textures.end(), heightMaps.begin(), heightMaps.end());
+
+    for (auto &texType : textureTypes) {
+      std::vector<Texture> loaded = loadMaterialTextures(
+          *scene, aiMaterial, texType.first, texType.second);
+      if (!loaded.empty()) {
+        std::cout << "Loaded " << loaded.size() << " " << texType.second
+                  << "(s)\n";
+      }
+      textures.insert(textures.end(), loaded.begin(), loaded.end());
+    }
+
+    std::cout << "Material " << mesh->mMaterialIndex << " has "
+              << textures.size() << " textures:\n";
+    for (const auto &tex : textures) {
+      std::cout << "  [" << tex.type << "] " << tex.path << " id: " << tex.id
+                << "\n";
+    }
 
     ExtractBoneWeightForVertices(vertices, mesh, scene);
 
-    return Mesh(vertices, indices, textures);
+    return Mesh(vertices, indices, textures, mesh->mName.C_Str());
   }
 
   void SetVertexBoneData(Vertex &vertex, int boneID, float weight) {
@@ -393,6 +442,12 @@ private:
           texture.path = str.C_Str();
           textures.push_back(texture);
           textures_loaded.push_back(texture);
+
+          // std::cout << "id " << textureID
+          //           << " First pixel RGBA: " << (int)tex->pcData->r << " "
+          //           << (int)tex->pcData->g << " " << (int)tex->pcData->b << "
+          //           "
+          //           << (int)tex->pcData->a << std::endl;
 
           if (tex->mHeight == 0)
             stbi_image_free(data); // free only if we used stbi
