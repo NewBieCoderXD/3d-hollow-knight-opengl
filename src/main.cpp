@@ -203,8 +203,6 @@ int main() {
   return 0;
 }
 
-void updateCameraFollow() {}
-
 // process all input: query GLFW whether relevant keys are pressed/released this
 // frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
@@ -257,6 +255,24 @@ void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
 void mouse_button_callback(GLFWwindow *window, int button, int action,
                            int mods) {
   if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+    glm::vec3 pos = knight->position + knight->getFront() * 1.0f;
+    float posX = pos.x;
+    float posY = pos.y;
+    // collision x-axis?
+    bool collisionX = hornet->position.x + hornet->width >= posX &&
+                      posX + knight->width >= hornet->position.x;
+    // collision y-axis?
+    bool collisionY = hornet->position.y + hornet->height >= posY &&
+                      posY + knight->height >= hornet->position.y;
+    std::cout << posX << " hornet x: " << hornet->position.x << " width "
+              << knight->width << std::endl;
+    std::cout << posY << " hornet x: " << hornet->position.y << " height "
+              << knight->height << std::endl;
+    // std::cout << collisionX << " " << collisionY << std::endl;
+    // collision only if on both axes
+    if (collisionX && collisionY) {
+      hornet->lastHit = lastFrame;
+    }
     knight->setAnimation("Knight_NailAction");
   }
 }
