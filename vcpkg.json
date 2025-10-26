@@ -1,9 +1,10 @@
 {
   "dependencies": [
+    "assimp",
     "glad",
     "glfw3",
-    "assimp",
     "glm",
-    "pugixml"
+    "pugixml",
+    "miniaudio"
   ]
 }

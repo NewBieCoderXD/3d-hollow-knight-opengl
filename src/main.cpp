@@ -22,6 +22,9 @@
 #include <iostream>
 #include <optional>
 
+#define MINIAUDIO_IMPLEMENTATION
+#include <miniaudio.h>
+
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
@@ -32,6 +35,8 @@ void mouse_button_callback(GLFWwindow *window, int button, int action,
 // settings
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
+
+ma_engine engine;
 
 // camera
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
@@ -115,6 +120,13 @@ int main() {
   glEnable(GL_DEPTH_TEST);
 
   std::srand(static_cast<unsigned int>(std::time(nullptr)));
+
+  ma_result result;
+
+  result = ma_engine_init(NULL, &engine);
+  if (result != MA_SUCCESS) {
+    return -1;
+  }
 
   // build and compile shaders
   // -------------------------
@@ -203,6 +215,7 @@ int main() {
 
       switch (hornetState) {
       case LUNGE: {
+        ma_engine_play_sound(&engine, "resources/audio/shaw.mp3", NULL);
         hornet->setAnimation("lunge", true);
         break;
       }
@@ -252,6 +265,7 @@ int main() {
   // glfw: terminate, clearing all previously allocated GLFW resources.
   // ------------------------------------------------------------------
   glfwTerminate();
+  ma_engine_uninit(&engine);
   return 0;
 }
 

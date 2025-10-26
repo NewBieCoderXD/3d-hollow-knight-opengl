@@ -30,6 +30,8 @@ find_package(assimp CONFIG REQUIRED)
 message(STATUS "Found ASSIMP in ${ASSIMP_INCLUDE_DIR}")
 find_package(glad CONFIG REQUIRED)
 message(STATUS "Found GLAD")
+# find_package(miniaudio REQUIRED)
+# message(STATUS "Found miniaudio")
 find_package(pugixml CONFIG REQUIRED)
 message(STATUS "Found pugixml")
 
