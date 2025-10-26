@@ -17,6 +17,8 @@
 
 #include <learnopengl/animator.h>
 
+#include <cstdlib>
+#include <ctime>
 #include <iostream>
 #include <optional>
 
@@ -47,15 +49,22 @@ std::optional<ModelAnimationAbs> hornet;
 bool CheckCollision(ModelAnimationAbs &one,
                     ModelAnimationAbs &two) // AABB - AABB collision
 {
-  // collision x-axis?
-  bool collisionX = one.position.x + one.width >= two.position.x &&
-                    two.position.x + two.width >= one.position.x;
-  // collision y-axis?
-  bool collisionY = one.position.y + one.height >= two.position.y &&
-                    two.position.y + two.height >= one.position.y;
-  // collision only if on both axes
+  bool collisionX = std::abs(one.position.x - two.position.x) <=
+                    (one.width / 2 + two.width / 2);
+  bool collisionY = std::abs(one.position.z - two.position.z) <=
+                    (one.height / 2 + two.height / 2);
   return collisionX && collisionY;
 }
+
+enum HornetState {
+  LUNGE,
+  DASH,
+  IDLE,
+};
+
+HornetState hornetState = IDLE;
+
+float lastHornetAttack = 0.0f;
 
 int main() {
   // glfw: initialize and configure
@@ -105,6 +114,8 @@ int main() {
   // -----------------------------
   glEnable(GL_DEPTH_TEST);
 
+  std::srand(static_cast<unsigned int>(std::time(nullptr)));
+
   // build and compile shaders
   // -------------------------
   Shader texturedModelShader("src/texturedModel.vert",
@@ -128,7 +139,7 @@ int main() {
 
   Assimp::Importer hornetImporter;
   hornet = ModelAnimationAbs(
-      hornetImporter, "resources/hollow-knight-hornet/source/hornet.glb");
+      hornetImporter, "resources/hollow-knight-hornet/source/hornet-v2.glb");
   hornet->position.x = 3.0f;
   hornet->scale = 2.5f;
 
@@ -180,11 +191,52 @@ int main() {
     model = glm::mat4(1.0f);
     hornet->draw(model, texturedModelShader, deltaTime, lastFrame);
 
+    if (lastFrame > lastHornetAttack + HORNET_ATTACK_COOLDOWN) {
+      // int action = (std::rand() % 3);
+      // hornetState = static_cast<HornetState>(action);
+      hornetState = LUNGE;
+
+      glm::mat4 lookAtMatrix = glm::lookAt(hornet->position, knight->position,
+                                           glm::vec3(0.0f, 1.0f, 0.0f));
+      glm::mat3 rotationMatrix = glm::mat3(glm::transpose(lookAtMatrix));
+      hornet->rotation = glm::quat_cast(rotationMatrix);
+
+      switch (hornetState) {
+      case LUNGE: {
+        hornet->setAnimation("lunge", true);
+        break;
+      }
+      case DASH: {
+        hornet->setAnimation("point_forward", true);
+        break;
+      }
+      case IDLE:
+        break;
+      }
+      lastHornetAttack = lastFrame;
+    }
+
+    switch (hornetState) {
+    case LUNGE: {
+      break;
+    }
+    case DASH: {
+      hornet->position -= hornet->getFront() * HORNET_DASH_SPEED * deltaTime;
+      break;
+    }
+    case IDLE:
+      break;
+    }
+
     if (CheckCollision(*knight, *hornet) &&
         lastFrame > DAMAGE_COOLDOWN + knight->lastHit) {
       knight->position +=
           glm::normalize(knight->position - hornet->position) * 1.0f;
       std::cout << "COLLISIONSS " << lastFrame << std::endl;
+      // std::cout << "knight: width " << knight->width << " height "
+      //           << knight->height << std::endl;
+      // std::cout << "hornet: width " << hornet->width << " height "
+      //           << hornet->height << std::endl;
       knight->lastHit = lastFrame;
     }
 
@@ -210,8 +262,6 @@ void processInput(GLFWwindow *window) {
   if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
     glfwSetWindowShouldClose(window, true);
 
-  float modelSpeed = 1;
-
   glm::vec3 moveDir(0.0f);
   glm::vec3 forwardXY =
       glm::normalize(glm::vec3(camera.Front.x, 0, camera.Front.z));
@@ -233,9 +283,12 @@ void processInput(GLFWwindow *window) {
 
   if (glm::length(moveDir) > 0.001f) {
     moveDir = glm::normalize(moveDir);
-    knight->position += moveDir * modelSpeed * deltaTime;
+    glm::vec3 newPos = knight->position + moveDir * KNIGHT_SPEED * deltaTime;
+    newPos.y = std::max(0.0f, newPos.y);
+    knight->position = newPos;
 
-    knight->rotation = glm::rotation(glm::vec3(0, 0, 1), moveDir);
+    moveDir.y = 0.0f;
+    // knight->rotation = glm::rotation(glm::vec3(0, 0, 1), moveDir);
 
     camera.KnightFront = moveDir;
   }
@@ -264,16 +317,16 @@ void mouse_button_callback(GLFWwindow *window, int button, int action,
     // collision y-axis?
     bool collisionY = hornet->position.y + hornet->height >= posY &&
                       posY + knight->height >= hornet->position.y;
-    std::cout << posX << " hornet x: " << hornet->position.x << " width "
-              << knight->width << std::endl;
-    std::cout << posY << " hornet x: " << hornet->position.y << " height "
-              << knight->height << std::endl;
+    // std::cout << posX << " hornet x: " << hornet->position.x << " width "
+    //           << knight->width << std::endl;
+    // std::cout << posY << " hornet x: " << hornet->position.y << " height "
+    //           << knight->height << std::endl;
     // std::cout << collisionX << " " << collisionY << std::endl;
     // collision only if on both axes
     if (collisionX && collisionY) {
       hornet->lastHit = lastFrame;
     }
-    knight->setAnimation("Knight_NailAction");
+    knight->setAnimation("Knight_NailAction", true);
   }
 }
 
@@ -298,6 +351,9 @@ void mouse_callback(GLFWwindow *window, double xposIn, double yposIn) {
   lastY = ypos;
 
   camera.ProcessMouseMovement(xoffset / SCR_WIDTH, yoffset / SCR_HEIGHT);
+  knight->rotation = glm::rotation(
+      glm::vec3(0, 0, 1),
+      glm::normalize(glm::vec3(camera.Front.x, 0.0, camera.Front.z)));
 }
 
 // glfw: whenever the mouse scroll wheel scrolls, this callback is called

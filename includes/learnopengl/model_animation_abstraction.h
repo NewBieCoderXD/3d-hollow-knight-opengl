@@ -18,7 +18,7 @@ public:
   float scale = 1.0f;
   float width;
   float height;
-  float lastHit;
+  float lastHit = 0.0f;
 
   Animator animator;
   const aiScene *scene;
@@ -34,27 +34,11 @@ public:
     this->model = std::make_unique<Model>(
         Model(scene, path.substr(0, path.find_last_of('/')), false));
 
-    float minX = std::numeric_limits<float>::max();
-    float maxX = std::numeric_limits<float>::lowest();
-
-    for (unsigned int i = 0; i < scene->mNumMeshes; ++i) {
-      const aiMesh *mesh = scene->mMeshes[i];
-      minX = std::min(minX, mesh->mAABB.mMin.x);
-      maxX = std::max(maxX, mesh->mAABB.mMax.x);
-    }
-
-    width = maxX - minX;
-
-    float minY = std::numeric_limits<float>::max();
-    float maxY = std::numeric_limits<float>::lowest();
-
-    for (unsigned int i = 0; i < scene->mNumMeshes; ++i) {
-      const aiMesh *mesh = scene->mMeshes[i];
-      minY = std::min(minY, mesh->mAABB.mMin.y);
-      maxY = std::max(maxY, mesh->mAABB.mMax.y);
-    }
-
-    height = maxY - minY;
+    aiVector3D min(FLT_MAX, FLT_MAX, FLT_MAX);
+    aiVector3D max(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+    ComputeBoundingBox(scene, scene->mRootNode, min, max, aiMatrix4x4());
+    width = max.x - min.x;
+    height = max.z - min.z;
 
     for (unsigned int i = 0; i < scene->mNumAnimations; i++) {
       aiAnimation *anim = scene->mAnimations[i];
@@ -65,11 +49,44 @@ public:
     }
   }
 
-  void setAnimation(std::string name) {
+  void ComputeBoundingBox(const aiScene *scene, const aiNode *node,
+                          aiVector3D &min, aiVector3D &max,
+                          const aiMatrix4x4 &parentTransform) {
+    aiMatrix4x4 currentTransform = parentTransform * node->mTransformation;
+
+    for (unsigned int i = 0; i < node->mNumMeshes; i++) {
+      const aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
+
+      aiVector3D aabbMin = mesh->mAABB.mMin;
+      aiVector3D aabbMax = mesh->mAABB.mMax;
+
+      // Transform the 8 corners of the AABB to world space
+      for (int j = 0; j < 8; ++j) {
+        aiVector3D corner((j & 1) ? aabbMax.x : aabbMin.x,
+                          (j & 2) ? aabbMax.y : aabbMin.y,
+                          (j & 4) ? aabbMax.z : aabbMin.z);
+        aiVector3D transformed = corner;
+        transformed *= currentTransform;
+        min.x = std::min(min.x, transformed.x);
+        min.y = std::min(min.y, transformed.y);
+        min.z = std::min(min.z, transformed.z);
+        max.x = std::max(max.x, transformed.x);
+        max.y = std::max(max.y, transformed.y);
+        max.z = std::max(max.z, transformed.z);
+      }
+    }
+
+    for (unsigned int i = 0; i < node->mNumChildren; i++)
+      ComputeBoundingBox(scene, node->mChildren[i], min, max, currentTransform);
+  }
+
+  void setAnimation(std::string name, bool reverse) {
     auto animationItr = this->nameToAnimation.find(name);
     if (animationItr != this->nameToAnimation.end()) {
       std::cout << "playing animation " << name << std::endl;
-      this->animator.PlayAnimation(&animationItr->second);
+      this->animator.PlayAnimation(&animationItr->second, reverse);
+    } else {
+      std::cout << "animation not found" << std::endl;
     }
   }
 
@@ -79,6 +96,8 @@ public:
 
     shader.use();
     if (lastFrame < DAMAGE_EFFECT + lastHit) {
+      // std::cout << "lastFrame: " << lastFrame << " lastHit: " << lastHit
+      //           << std::endl;
       glUniform1i(isHitLocation, true);
     } else {
       glUniform1i(isHitLocation, false);
@@ -101,8 +120,8 @@ public:
       animator.m_CurrentTime += deltaTime * ticksPerSecond;
 
       // Wrap around the animation duration
-      timeInTicks = animator.m_CurrentTime;
-      if (animator.m_CurrentTime > foundAnim->m_Duration) {
+      timeInTicks = animator.getFrame();
+      if (animator.m_CurrentTime > animator.duration) {
         animator.m_CurrentAnimation = nullptr;
       }
     }

@@ -57,20 +57,20 @@ public:
       }
     }
 
-    glm::vec3 start = GetGLMVec(channel->mPositionKeys[index].mValue);
-
-    return start;
-    // unsigned int nextIndex = index + 1;
-    // float deltaTime = (float)(channel->mPositionKeys[nextIndex].mTime -
-    //                           channel->mPositionKeys[index].mTime);
-    // float factor =
-    //     (animationTime - (float)channel->mPositionKeys[index].mTime) /
-    //     deltaTime;
-
     // glm::vec3 start = GetGLMVec(channel->mPositionKeys[index].mValue);
-    // glm::vec3 end = GetGLMVec(channel->mPositionKeys[nextIndex].mValue);
 
-    // return glm::mix(start, end, factor);
+    // return start;
+
+    unsigned int nextIndex = index + 1;
+    float deltaTime = (float)(channel->mPositionKeys[nextIndex].mTime -
+                              channel->mPositionKeys[index].mTime);
+    float factor =
+        (timeInTicks - (float)channel->mPositionKeys[index].mTime) / deltaTime;
+
+    glm::vec3 start = GetGLMVec(channel->mPositionKeys[index].mValue);
+    glm::vec3 end = GetGLMVec(channel->mPositionKeys[nextIndex].mValue);
+
+    return glm::mix(start, end, factor);
   }
 
   static glm::quat SlerpRotation(aiNodeAnim *channel, float animationTime) {
