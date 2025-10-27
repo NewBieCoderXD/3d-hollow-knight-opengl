@@ -10,6 +10,10 @@ cmake -S . -B build
 vcpkg install
 ```
 
+# Demo
+
+[Loading video](https://github.com/NewBieCoderXD/3d-hollow-knight-opengl/raw/refs/heads/main/readme/2025-10-27%2022-01-15.mkv)
+
 # Acknowledgements
 
 ground stone: https://sketchfab.com/3d-models/stone-ground-01-a-63c64a9f582843d1bdfdce756326ce0f
