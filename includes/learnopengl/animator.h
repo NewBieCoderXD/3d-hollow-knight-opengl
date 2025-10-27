@@ -30,6 +30,8 @@ public:
   // float changeSign() { return (m_CurrentTime / duration - 0.5 >= 0) ? 1 : -1;
   // }
 
+  bool isOver() { return this->m_CurrentTime >= duration; }
+
   float getFrame() {
     if (reverse) {
       return duration / 2.0f - std::abs(m_CurrentTime - duration / 2.0f);

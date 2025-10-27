@@ -1,9 +1,11 @@
 #ifndef MODEL_H
 #define MODEL_H
 
+#include "assimp/vector3.h"
 #include "glm/ext/matrix_float4x4.hpp"
 #include "glm/fwd.hpp"
 #include "learnopengl/bone.h"
+#include "learnopengl/box.hpp"
 #include <assimp/anim.h>
 #include <glad/glad.h>
 
@@ -12,6 +14,7 @@
 #include <assimp/scene.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <memory>
 #include <stb_image.h>
 
 #include <learnopengl/mesh.h>
@@ -65,19 +68,27 @@ public:
   vector<Mesh> meshes;
   string directory;
   bool gammaCorrection;
+  string weaponMesh = "";
+  glm::vec3 weaponSize = glm::vec3(0.0f);
+  std::unique_ptr<DebugBox> weaponHitbox;
   std::vector<MeshAnimationChannel> meshAnimationCache;
+  bool showHitbox = false;
 
   // constructor, expects a filepath to a 3D model.
   Model(string const &path, bool gamma = false) : gammaCorrection(gamma) {
     loadModel(path);
   }
 
-  Model(const aiScene *scene, const std::string &directory, bool gamma = false)
+  Model(const aiScene *scene, const std::string &directory,
+        std::string weaponMesh, bool gamma = false)
       : gammaCorrection(gamma), directory(directory) {
     if (!scene || !scene->mRootNode) {
       std::cerr << "ERROR::MODEL::INVALID_SCENE_POINTER\n";
       return;
-    }
+    };
+
+    this->weaponMesh = weaponMesh;
+
     processNode(scene->mRootNode, scene);
     std::cout << "Number of meshes: " << meshes.size() << std::endl;
 
@@ -87,6 +98,30 @@ public:
       aiAnimation *animation =
           scene->mAnimations[0]; // pick first animation for now
       BuildMeshAnimationCache(scene, animation);
+    }
+  }
+
+  void computeMeshSize(aiMesh *mesh, glm::mat4 nodeTransform, aiVector3D &min,
+                       aiVector3D &max) const {
+    aiVector3D aabbMin = mesh->mAABB.mMin;
+    aiVector3D aabbMax = mesh->mAABB.mMax;
+
+    for (int i = 0; i < 8; ++i) {
+      glm::vec3 corner((i & 1) ? aabbMax.x : aabbMin.x,
+                       (i & 2) ? aabbMax.y : aabbMin.y,
+                       (i & 4) ? aabbMax.z : aabbMin.z);
+
+      // Apply node transform
+      glm::vec4 transformed = nodeTransform * glm::vec4(corner, 1.0f);
+
+      // Update min/max
+      min.x = std::min(min.x, transformed.x);
+      min.y = std::min(min.y, transformed.y);
+      min.z = std::min(min.z, transformed.z);
+
+      max.x = std::max(max.x, transformed.x);
+      max.y = std::max(max.y, transformed.y);
+      max.z = std::max(max.z, transformed.z);
     }
   }
 
@@ -126,7 +161,8 @@ public:
   }
 
   // draws the model, and thus all its meshes
-  void Draw(glm::mat4 objectModel, Shader &shader, float time) {
+  void Draw(glm::mat4 objectModel, Shader &shader, Shader &hitboxShader,
+            float time, bool showHitbox) {
     for (unsigned int i = 0; i < meshes.size(); i++) {
       glm::mat4 transform = meshNodeTransforms[i];
 
@@ -136,18 +172,6 @@ public:
         glm::vec3 pos = AssimpGLMHelpers::LerpPosition(found.channel, time);
         glm::quat rot = AssimpGLMHelpers::SlerpRotation(found.channel, time);
         glm::vec3 scale = AssimpGLMHelpers::LerpScale(found.channel, time);
-
-        // float oldY = pos.y;
-        // pos.y = pos.z;
-        // pos.z = oldY;
-
-        // float oldY = rot.y;
-        // rot.y = rot.z;
-        // rot.z = oldY;
-
-        // glm::quat correction =
-        //     glm::angleAxis(glm::radians(-90.0f), glm::vec3(1, 0, 0));
-        // rot = correction * rot;
 
         animTransform = glm::translate(animTransform, pos);
         glm::mat4 rotMat = glm::toMat4(rot);
@@ -160,6 +184,17 @@ public:
 
       // std::cout << "name " << meshes[i].name << std::endl;
       meshes[i].Draw(shader);
+
+      // std::cout << "mesh name: " << meshes[i].name << " "
+      //           << (meshes[i].name == weaponMesh) << std::endl;
+      if (meshes[i].name == "hornet.008") {
+        weaponHitbox->setVisible(true);
+        weaponHitbox->draw(objectModel * transform, hitboxShader);
+      }
+      // if (meshes[i].name == weaponMesh) {
+      //   weaponHitbox->setVisible(true);
+      //   weaponHitbox->draw(objectModel * transform, hitboxShader);
+      // }
     }
   }
 
@@ -206,6 +241,24 @@ private:
       // the scene. the scene contains all the data, node is just to keep stuff
       // organized (like relations between nodes).
       aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
+
+      // std::cout << "gg" << mesh->mName.C_Str() << weaponMesh << std::endl;
+      if (mesh->mName.C_Str() == weaponMesh) {
+        aiVector3D weaponMin(FLT_MAX, FLT_MAX, FLT_MAX);
+        aiVector3D weaponMax(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+        computeMeshSize(mesh, nodeTransform, weaponMin, weaponMax);
+        weaponSize =
+            glm::vec3(weaponMax.x - weaponMin.x, weaponMax.y - weaponMin.y,
+                      weaponMax.z - weaponMin.z);
+
+        std::cout << "weapon: " << this->weaponMesh
+                  << " size: " << glm::to_string(weaponSize) << std::endl;
+
+        weaponHitbox = std::make_unique<DebugBox>(
+            glm::vec3(weaponMin.x, weaponMin.y, weaponMin.z),
+            glm::vec3(weaponMax.x, weaponMax.y, weaponMax.z));
+      }
+
       meshes.push_back(processMesh(mesh, scene));
       meshNodeTransforms.push_back(nodeTransform);
     }
@@ -295,7 +348,7 @@ private:
 
     ExtractBoneWeightForVertices(vertices, mesh, scene);
 
-    return Mesh(vertices, indices, textures, mesh->mName.C_Str());
+    return Mesh(vertices, indices, textures, mesh->mName.C_Str(), mesh->mAABB);
   }
 
   void SetVertexBoneData(Vertex &vertex, int boneID, float weight) {

@@ -51,24 +51,28 @@ float lastFrame = 0.0f;
 std::optional<ModelAnimationAbs> knight;
 std::optional<ModelAnimationAbs> hornet;
 
-bool CheckCollision(ModelAnimationAbs &one,
-                    ModelAnimationAbs &two) // AABB - AABB collision
-{
-  bool collisionX = std::abs(one.position.x - two.position.x) <=
-                    (one.width / 2 + two.width / 2);
-  bool collisionY = std::abs(one.position.z - two.position.z) <=
-                    (one.height / 2 + two.height / 2);
-  return collisionX && collisionY;
+inline bool CheckAABBCollision(const glm::vec3 &posA, const glm::vec3 &sizeA,
+                               const glm::vec3 &posB, const glm::vec3 &sizeB) {
+  // Half extents
+  glm::vec3 halfA = sizeA * 0.5f;
+  glm::vec3 halfB = sizeB * 0.5f;
+
+  bool collisionX = std::abs(posA.x - posB.x) <= (halfA.x + halfB.x);
+  bool collisionY = std::abs(posA.y - posB.y) <= (halfA.y + halfB.y);
+  bool collisionZ = std::abs(posA.z - posB.z) <= (halfA.z + halfB.z);
+
+  return collisionX && collisionY && collisionZ;
 }
 
 enum HornetState {
+  LUNGE_WAIT,
   LUNGE,
   DASH,
   IDLE,
 };
 
 HornetState hornetState = IDLE;
-
+float lastHornetStateSet = 0.0f;
 float lastHornetAttack = 0.0f;
 
 int main() {
@@ -146,12 +150,13 @@ int main() {
   stbi_set_flip_vertically_on_load(false);
 
   Assimp::Importer knightImporter;
-  knight = ModelAnimationAbs(knightImporter,
-                             "resources/hollow-knight-the-knight.glb");
+  knight.emplace(knightImporter, "resources/hollow-knight-the-knight.glb",
+                 "Knight_Nail");
 
   Assimp::Importer hornetImporter;
-  hornet = ModelAnimationAbs(
-      hornetImporter, "resources/hollow-knight-hornet/source/hornet-v2.glb");
+  hornet.emplace(hornetImporter,
+                 "resources/hollow-knight-hornet/source/hornet-v2.glb",
+                 "hornet.008");
   hornet->position.x = 3.0f;
   hornet->scale = 2.5f;
 
@@ -198,28 +203,35 @@ int main() {
 
     // render the loaded model
     glm::mat4 model = glm::mat4(1.0f);
-    knight->draw(model, texturedModelShader, deltaTime, lastFrame);
+    knight->draw(model, texturedModelShader, simple3dShader, deltaTime,
+                 lastFrame);
 
     model = glm::mat4(1.0f);
-    hornet->draw(model, texturedModelShader, deltaTime, lastFrame);
+    hornet->draw(model, texturedModelShader, simple3dShader, deltaTime,
+                 lastFrame);
 
-    if (lastFrame > lastHornetAttack + HORNET_ATTACK_COOLDOWN) {
+    if (hornetState == IDLE &&
+        lastFrame > lastHornetAttack + HORNET_ATTACK_COOLDOWN) {
       // int action = (std::rand() % 3);
       // hornetState = static_cast<HornetState>(action);
-      hornetState = LUNGE;
+      hornetState = LUNGE_WAIT;
 
       glm::mat4 lookAtMatrix = glm::lookAt(hornet->position, knight->position,
                                            glm::vec3(0.0f, 1.0f, 0.0f));
       glm::mat3 rotationMatrix = glm::mat3(glm::transpose(lookAtMatrix));
-      hornet->rotation = glm::quat_cast(rotationMatrix);
 
       switch (hornetState) {
-      case LUNGE: {
+      case LUNGE_WAIT: {
+        hornet->rotation = glm::quat_cast(rotationMatrix);
         ma_engine_play_sound(&engine, "resources/audio/shaw.mp3", NULL);
-        hornet->setAnimation("lunge", true);
+        lastHornetStateSet = lastFrame;
+        break;
+      }
+      case LUNGE: {
         break;
       }
       case DASH: {
+        hornet->rotation = glm::quat_cast(rotationMatrix);
         hornet->setAnimation("point_forward", true);
         break;
       }
@@ -230,7 +242,18 @@ int main() {
     }
 
     switch (hornetState) {
+    case LUNGE_WAIT: {
+      if (lastFrame > lastHornetStateSet + 1.0f) {
+        hornetState = LUNGE;
+        hornet->setAnimation("lunge", true);
+        lastHornetStateSet = lastFrame;
+      }
+      break;
+    }
     case LUNGE: {
+      if (hornet->animator.isOver()) {
+        hornetState = IDLE;
+      }
       break;
     }
     case DASH: {
@@ -241,7 +264,9 @@ int main() {
       break;
     }
 
-    if (CheckCollision(*knight, *hornet) &&
+    // Check if knight body hit hornet
+    if (CheckAABBCollision(knight->position, knight->modelSize,
+                           hornet->position, hornet->modelSize) &&
         lastFrame > DAMAGE_COOLDOWN + knight->lastHit) {
       knight->position +=
           glm::normalize(knight->position - hornet->position) * 1.0f;
@@ -251,6 +276,21 @@ int main() {
       // std::cout << "hornet: width " << hornet->width << " height "
       //           << hornet->height << std::endl;
       knight->lastHit = lastFrame;
+    }
+
+    // Check if knight's nail hit hornet
+    if (CheckAABBCollision(knight->getWeaponPosition(lastFrame),
+                           knight->model->weaponSize, hornet->position,
+                           hornet->modelSize) &&
+        lastFrame > DAMAGE_COOLDOWN + hornet->lastHit) {
+      hornet->position +=
+          glm::normalize(hornet->position - knight->position) * 1.0f;
+      std::cout << "COLLISIONSS " << lastFrame << std::endl;
+      // std::cout << "knight: width " << knight->width << " height "
+      //           << knight->height << std::endl;
+      // std::cout << "hornet: width " << hornet->width << " height "
+      //           << hornet->height << std::endl;
+      hornet->lastHit = lastFrame;
     }
 
     // camera.LookAt = knight->position;
@@ -264,8 +304,8 @@ int main() {
 
   // glfw: terminate, clearing all previously allocated GLFW resources.
   // ------------------------------------------------------------------
-  glfwTerminate();
   ma_engine_uninit(&engine);
+  glfwTerminate();
   return 0;
 }
 
@@ -325,21 +365,22 @@ void mouse_button_callback(GLFWwindow *window, int button, int action,
     glm::vec3 pos = knight->position + knight->getFront() * 1.0f;
     float posX = pos.x;
     float posY = pos.y;
-    // collision x-axis?
-    bool collisionX = hornet->position.x + hornet->width >= posX &&
-                      posX + knight->width >= hornet->position.x;
-    // collision y-axis?
-    bool collisionY = hornet->position.y + hornet->height >= posY &&
-                      posY + knight->height >= hornet->position.y;
+    // // collision x-axis?
+    // bool collisionX = hornet->position.x + hornet->widthX >= posX &&
+    //                   posX + knight->widthX >= hornet->position.x;
+    // // collision y-axis?
+    // bool collisionY = hornet->position.y + hornet->widthZ >= posY &&
+    //                   posY + knight->widthZ >= hornet->position.y;
+
     // std::cout << posX << " hornet x: " << hornet->position.x << " width "
     //           << knight->width << std::endl;
     // std::cout << posY << " hornet x: " << hornet->position.y << " height "
     //           << knight->height << std::endl;
     // std::cout << collisionX << " " << collisionY << std::endl;
     // collision only if on both axes
-    if (collisionX && collisionY) {
-      hornet->lastHit = lastFrame;
-    }
+    // if (collisionX && collisionY) {
+    //   hornet->lastHit = lastFrame;
+    // }
     knight->setAnimation("Knight_NailAction", true);
   }
 }

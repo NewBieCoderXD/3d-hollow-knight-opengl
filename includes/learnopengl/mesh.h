@@ -1,6 +1,7 @@
 #ifndef MESH_H
 #define MESH_H
 
+#include "assimp/aabb.h"
 #include "assimp/material.h"
 #include "assimp/types.h"
 #include <glad/glad.h> // holds all OpenGL type declarations
@@ -51,6 +52,11 @@ struct Material {
   std::unordered_map<aiTextureType, Texture> textures;
 };
 
+struct AABB {
+  glm::vec3 mMin;
+  glm::vec3 mMax;
+};
+
 class Mesh {
 public:
   // mesh Data
@@ -60,14 +66,18 @@ public:
   unsigned int VAO;
   string name;
   Material material;
+  AABB mAABB;
 
   // constructor
   Mesh(vector<Vertex> vertices, vector<unsigned int> indices,
-       vector<Texture> textures, string name) {
+       vector<Texture> textures, string name, aiAABB mAiAABB) {
     this->vertices = vertices;
     this->indices = indices;
     this->textures = textures;
     this->name = name;
+    this->mAABB = {
+        .mMin = glm::vec3(mAiAABB.mMin.x, mAiAABB.mMin.y, mAiAABB.mMin.z),
+        .mMax = glm::vec3(mAiAABB.mMax.x, mAiAABB.mMax.y, mAiAABB.mMax.z)};
     // for (uint i = 0; i < this->vertices.size(); i++) {
     //   for (auto vertex : vertices) {
     //     std::cout << "x: " << vertex.Position.x << " y: " <<
