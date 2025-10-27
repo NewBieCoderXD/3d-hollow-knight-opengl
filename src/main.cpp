@@ -234,14 +234,17 @@ int main() {
     if (hornetState == IDLE &&
         lastFrame > lastHornetAttack + HORNET_ATTACK_COOLDOWN) {
 
-      if (glm::length(hornet->position - knight->position) < 3.0) {
+      if (glm::length(hornet->position - knight->position) < 4.0) {
         int action = (std::rand() % 3);
-        hornetState = static_cast<HornetState>(action);
+        // hornetState = static_cast<HornetState>(action);
         switch (action) {
         case 0:
           hornetState = LUNGE_WAIT;
           break;
         case 1:
+          hornetState = LUNGE_WAIT;
+          break;
+        case 2:
           hornetState = DASH_WAIT;
           break;
         }
@@ -267,12 +270,12 @@ int main() {
       case DASH_WAIT: {
         hornet->rotation = glm::quat_cast(rotationMatrix);
         ma_engine_play_sound(&engine, "resources/audio/shaw.mp3", NULL);
+        hornet->setAnimation("point_forward", false);
         lastHornetStateSet = lastFrame;
         break;
       }
       case DASH: {
         hornet->rotation = glm::quat_cast(rotationMatrix);
-        hornet->setAnimation("point_forward", false);
         break;
       }
       case IDLE:
@@ -285,13 +288,13 @@ int main() {
     case LUNGE_WAIT: {
       if (lastFrame > lastHornetStateSet + 1.0f) {
         hornetState = LUNGE;
-        hornet->setAnimation("lunge", true);
+        hornet->setAnimation("point_forward", true);
         lastHornetStateSet = lastFrame;
       }
       break;
     }
     case LUNGE: {
-      if (hornet->animator.isOver()) {
+      if (hornet->animator.isOver() && lastFrame > lastHornetStateSet + 3.0f) {
         hornetState = IDLE;
       }
       break;

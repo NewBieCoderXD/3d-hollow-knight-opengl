@@ -65,7 +65,7 @@ public:
       const char *name = anim->mName.C_Str();
       std::cout << "Found action " << name << std::endl;
       this->nameToAnimation.insert(
-          {string(name), Animation(*scene, anim, this->model.get())});
+          {string(name), Animation(*scene, anim, name, this->model.get())});
     }
   }
 
@@ -154,6 +154,7 @@ public:
       hitbox->draw(modelMtx, hitboxShader);
     }
   }
+
   glm::vec3 getWeaponPosition() {
     glm::mat4 weaponMtx = glm::translate(glm::mat4(1.0f), position) *
                           glm::toMat4(rotation) *

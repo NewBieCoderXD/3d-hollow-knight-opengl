@@ -21,6 +21,9 @@ class Animation {
 public:
   float m_Duration;
   int m_TicksPerSecond;
+  string name;
+  // TODO: Make scene live longer so animation doesn't die
+  aiAnimation *animation;
   Animation() = default;
 
   Animation(const std::string &animationPath, Model *model) {
@@ -28,7 +31,7 @@ public:
     const aiScene *scene =
         importer.ReadFile(animationPath, aiProcess_Triangulate);
     assert(scene && scene->mRootNode);
-    auto animation = scene->mAnimations[0];
+    animation = scene->mAnimations[0];
     m_Duration = animation->mDuration;
     m_TicksPerSecond = animation->mTicksPerSecond;
     aiMatrix4x4 globalTransformation = scene->mRootNode->mTransformation;
@@ -37,7 +40,10 @@ public:
     ReadMissingBones(animation, *model);
   }
 
-  Animation(const aiScene &scene, aiAnimation *animation, Model *model) {
+  Animation(const aiScene &scene, aiAnimation *animation, std::string name,
+            Model *model) {
+    this->animation = animation;
+    this->name = name;
     m_Duration = animation->mDuration;
     m_TicksPerSecond = animation->mTicksPerSecond;
     aiMatrix4x4 globalTransformation = scene.mRootNode->mTransformation;
