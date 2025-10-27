@@ -271,26 +271,29 @@ int main() {
       knight->position +=
           glm::normalize(knight->position - hornet->position) * 1.0f;
       std::cout << "COLLISIONSS " << lastFrame << std::endl;
-      // std::cout << "knight: width " << knight->width << " height "
-      //           << knight->height << std::endl;
-      // std::cout << "hornet: width " << hornet->width << " height "
-      //           << hornet->height << std::endl;
       knight->lastHit = lastFrame;
     }
 
     // Check if knight's nail hit hornet
-    if (CheckAABBCollision(knight->getWeaponPosition(lastFrame),
+    if (CheckAABBCollision(knight->getWeaponPosition(),
                            knight->model->weaponSize, hornet->position,
                            hornet->modelSize) &&
         lastFrame > DAMAGE_COOLDOWN + hornet->lastHit) {
+      std::cout << "COLLISIONSS " << lastFrame << std::endl;
       hornet->position +=
           glm::normalize(hornet->position - knight->position) * 1.0f;
-      std::cout << "COLLISIONSS " << lastFrame << std::endl;
-      // std::cout << "knight: width " << knight->width << " height "
-      //           << knight->height << std::endl;
-      // std::cout << "hornet: width " << hornet->width << " height "
-      //           << hornet->height << std::endl;
       hornet->lastHit = lastFrame;
+    }
+
+    // Check if hornet's needle hit knight
+    if (CheckAABBCollision(knight->position, knight->modelSize,
+                           hornet->getWeaponPosition(),
+                           hornet->model->weaponSize) &&
+        lastFrame > DAMAGE_COOLDOWN + knight->lastHit) {
+      std::cout << "COLLISIONSS " << lastFrame << std::endl;
+      hornet->position +=
+          glm::normalize(knight->position - hornet->position) * 1.0f;
+      knight->lastHit = lastFrame;
     }
 
     // camera.LookAt = knight->position;

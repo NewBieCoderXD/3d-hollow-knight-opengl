@@ -147,7 +147,7 @@ public:
       hitbox->setVisible(false);
     }
   }
-  glm::vec3 getWeaponPosition(float time) {
+  glm::vec3 getWeaponPosition() {
     glm::mat4 weaponMtx = glm::translate(glm::mat4(1.0f), position) *
                           glm::toMat4(rotation) *
                           glm::scale(glm::mat4(1.0f), glm::vec3(scale));
