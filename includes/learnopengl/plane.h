@@ -13,7 +13,6 @@ public:
 
   Plane(float size = 10.0f, unsigned int tex = 0)
       : position(0.0f), scale(glm::vec3(size)), rotation(0.0f) {
-    float half = size / 2.0f;
     float vertices[] = {
         // positions (X, Y, Z)
         1.0f, 0.0f, 1.0f, -1.0f, 0.0f, 1.0f,  -1.0f, 0.0f, -1.0f,

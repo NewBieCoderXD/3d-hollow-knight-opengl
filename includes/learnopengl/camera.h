@@ -17,7 +17,7 @@ enum Camera_Movement { FORWARD, BACKWARD, LEFT, RIGHT };
 const float YAW = -90.0f;
 const float PITCH = 60.0f;
 const float SPEED = 2.5f;
-const float SENSITIVITY = 50.0f;
+const float SENSITIVITY = 100.0f;
 const float ZOOM = 45.0f;
 
 // An abstract camera class that processes input and calculates the
@@ -100,13 +100,16 @@ public:
     Yaw += xoffset;
     Pitch += yoffset;
 
-    // make sure that when pitch is out of bounds, screen doesn't get flipped
-    if (constrainPitch) {
-      if (Pitch > 89.0f)
-        Pitch = 89.0f;
-      if (Pitch < -89.0f)
-        Pitch = -89.0f;
-    }
+    Pitch = std::max(40.0f, std::min(75.0f, Pitch));
+
+    // make sure that when pitch is out of bounds, screen doesn't get
+    // flipped
+    // if (constrainPitch) {
+    //   if (Pitch > 89.0f)
+    //     Pitch = 89.0f;
+    //   if (Pitch < -89.0f)
+    //     Pitch = -89.0f;
+    // }
 
     // update Front, Right and Up Vectors using the updated Euler angles
     updateCameraVectors();

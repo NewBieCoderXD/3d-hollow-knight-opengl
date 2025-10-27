@@ -20,13 +20,15 @@ public:
   float scale = 1.0f;
 
   glm::vec3 modelSize = glm::vec3(0.0f);
+  float health = 5.0f;
+  float maxHealth = 5.0f;
 
   std::string weaponMesh = "";
 
   float lastHit = 0.0f;
   std::unique_ptr<DebugBox> hitbox;
   // std::unique_ptr<DebugBox> weaponHitbox;
-  const bool showHitbox = true;
+  const bool showHitbox = false;
 
   Animator animator;
   const aiScene *scene;
@@ -35,6 +37,10 @@ public:
                     std::string weaponMesh, bool gamma = false)
       : animator(NULL) {
     this->weaponMesh = weaponMesh;
+
+    if (!showHitbox) {
+      weaponMesh = "";
+    }
 
     scene = importer.ReadFile(
         FileSystem::getPath(path),
@@ -106,6 +112,9 @@ public:
 
   void draw(glm::mat4 modelMtx, Shader &shader, Shader &hitboxShader,
             float deltaTime, float lastFrame) {
+    if (health < 0) {
+      return;
+    }
     GLint isHitLocation = glGetUniformLocation(shader.ID, "isHit");
 
     shader.use();
@@ -143,8 +152,6 @@ public:
     if (showHitbox) {
       hitbox->setVisible(true);
       hitbox->draw(modelMtx, hitboxShader);
-    } else {
-      hitbox->setVisible(false);
     }
   }
   glm::vec3 getWeaponPosition() {
@@ -155,13 +162,6 @@ public:
     float timeInTicks = 0.0f;
     Animation *foundAnim = animator.GetAnimation();
     if (foundAnim != nullptr) {
-      float ticksPerSecond = foundAnim->m_TicksPerSecond != 0
-                                 ? foundAnim->m_TicksPerSecond
-                                 : 25.0f;
-      // float ticksPerSecond = 50.0f;
-
-      // Accumulate animation time internally
-
       // Wrap around the animation duration
       timeInTicks = animator.getFrame();
       if (animator.m_CurrentTime > animator.duration) {

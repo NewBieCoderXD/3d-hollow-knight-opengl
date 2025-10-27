@@ -10,12 +10,6 @@ public:
     initBox(minCorner, maxCorner);
   }
 
-  ~DebugBox() {
-    glDeleteVertexArrays(1, &VAO);
-    glDeleteBuffers(1, &VBO);
-    glDeleteBuffers(1, &EBO);
-  }
-
   // Draw the box using a shader supplied by the caller.
   // The shader should already be bound and have view/projection set.
   void draw(const glm::mat4 &model, Shader &shaderProgram) const {

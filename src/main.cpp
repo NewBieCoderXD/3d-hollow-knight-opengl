@@ -1,4 +1,5 @@
 #include "glm/geometric.hpp"
+#include "learnopengl/bar.h"
 #include "learnopengl/model_animation.h"
 #include "learnopengl/plane.h"
 #include <GLFW/glfw3.h>
@@ -33,8 +34,8 @@ void mouse_button_callback(GLFWwindow *window, int button, int action,
                            int mods);
 
 // settings
-const unsigned int SCR_WIDTH = 800;
-const unsigned int SCR_HEIGHT = 600;
+unsigned int SCR_WIDTH = 800;
+unsigned int SCR_HEIGHT = 600;
 
 ma_engine engine;
 
@@ -67,6 +68,7 @@ inline bool CheckAABBCollision(const glm::vec3 &posA, const glm::vec3 &sizeA,
 enum HornetState {
   LUNGE_WAIT,
   LUNGE,
+  DASH_WAIT,
   DASH,
   IDLE,
 };
@@ -74,6 +76,9 @@ enum HornetState {
 HornetState hornetState = IDLE;
 float lastHornetStateSet = 0.0f;
 float lastHornetAttack = 0.0f;
+
+const float maxHealth = 5.0;
+float currentHealth = maxHealth;
 
 int main() {
   // glfw: initialize and configure
@@ -89,8 +94,11 @@ int main() {
 
   // glfw window creation
   // --------------------
-  GLFWwindow *window =
-      glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+  const GLFWvidmode *mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+  SCR_WIDTH = mode->width;
+  SCR_HEIGHT = mode->height;
+  GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL",
+                                        glfwGetPrimaryMonitor(), NULL);
   if (window == NULL) {
     const char *description;
     int code = glfwGetError(&description);
@@ -139,6 +147,8 @@ int main() {
 
   Shader simple3dShader("src/simple3d.vert", "src/simple3d.frag");
 
+  Shader simple2dShader("src/simple2d.vert", "src/simple3d.frag");
+
   Plane ground(1.0f);
   ground.position = glm::vec3(0.0f, 0.0f, 0.0f);
   ground.rotation = glm::vec3(0.0f);
@@ -159,6 +169,14 @@ int main() {
                  "hornet.008");
   hornet->position.x = 3.0f;
   hornet->scale = 2.5f;
+
+  Assimp::Importer stoneGroundImporter;
+  ModelAnimationAbs stoneGround(stoneGroundImporter,
+                                "resources/stone_ground_01_a.glb", "");
+  stoneGround.position.y = 4.0f;
+
+  HealthBar playerHealth(200.0f, 20.0f, glm::vec2(10.0f, 10.0f),
+                         glm::vec3(1.0f, 0.0f, 0.0f));
 
   // draw in wireframe
   // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -210,11 +228,27 @@ int main() {
     hornet->draw(model, texturedModelShader, simple3dShader, deltaTime,
                  lastFrame);
 
+    stoneGround.draw(model, texturedModelShader, simple3dShader, deltaTime,
+                     lastFrame);
+
     if (hornetState == IDLE &&
         lastFrame > lastHornetAttack + HORNET_ATTACK_COOLDOWN) {
-      // int action = (std::rand() % 3);
-      // hornetState = static_cast<HornetState>(action);
-      hornetState = LUNGE_WAIT;
+
+      if (glm::length(hornet->position - knight->position) < 3.0) {
+        int action = (std::rand() % 3);
+        hornetState = static_cast<HornetState>(action);
+        switch (action) {
+        case 0:
+          hornetState = LUNGE_WAIT;
+          break;
+        case 1:
+          hornetState = DASH_WAIT;
+          break;
+        }
+      } else {
+        hornetState = DASH_WAIT;
+      }
+      // hornetState = LUNGE_WAIT;
 
       glm::mat4 lookAtMatrix = glm::lookAt(hornet->position, knight->position,
                                            glm::vec3(0.0f, 1.0f, 0.0f));
@@ -230,9 +264,15 @@ int main() {
       case LUNGE: {
         break;
       }
+      case DASH_WAIT: {
+        hornet->rotation = glm::quat_cast(rotationMatrix);
+        ma_engine_play_sound(&engine, "resources/audio/shaw.mp3", NULL);
+        lastHornetStateSet = lastFrame;
+        break;
+      }
       case DASH: {
         hornet->rotation = glm::quat_cast(rotationMatrix);
-        hornet->setAnimation("point_forward", true);
+        hornet->setAnimation("point_forward", false);
         break;
       }
       case IDLE:
@@ -256,8 +296,19 @@ int main() {
       }
       break;
     }
+    case DASH_WAIT: {
+      if (lastFrame > lastHornetStateSet + 1.0f) {
+        hornetState = DASH;
+        lastHornetStateSet = lastFrame;
+      }
+      break;
+    }
     case DASH: {
       hornet->position -= hornet->getFront() * HORNET_DASH_SPEED * deltaTime;
+      if (lastFrame > lastHornetStateSet + 0.6f) {
+        hornetState = IDLE;
+        lastHornetStateSet = lastFrame;
+      }
       break;
     }
     case IDLE:
@@ -265,39 +316,46 @@ int main() {
     }
 
     // Check if knight body hit hornet
-    if (CheckAABBCollision(knight->position, knight->modelSize,
-                           hornet->position, hornet->modelSize) &&
-        lastFrame > DAMAGE_COOLDOWN + knight->lastHit) {
+    if (lastFrame > DAMAGE_COOLDOWN + knight->lastHit &&
+        CheckAABBCollision(knight->position, knight->modelSize,
+                           hornet->position, hornet->modelSize / 2.0f)) {
       knight->position +=
           glm::normalize(knight->position - hornet->position) * 1.0f;
-      std::cout << "COLLISIONSS " << lastFrame << std::endl;
+      currentHealth -= 1;
+      playerHealth.setHealth(currentHealth, maxHealth);
       knight->lastHit = lastFrame;
     }
 
     // Check if knight's nail hit hornet
-    if (CheckAABBCollision(knight->getWeaponPosition(),
-                           knight->model->weaponSize, hornet->position,
-                           hornet->modelSize) &&
-        lastFrame > DAMAGE_COOLDOWN + hornet->lastHit) {
-      std::cout << "COLLISIONSS " << lastFrame << std::endl;
+    if (lastFrame > DAMAGE_COOLDOWN + hornet->lastHit &&
+        CheckAABBCollision(knight->getWeaponPosition(),
+                           knight->model->weaponSize * 2.0f, hornet->position,
+                           hornet->modelSize * 2.0f)) {
+      std::cout << "HIT " << lastFrame << std::endl;
       hornet->position +=
           glm::normalize(hornet->position - knight->position) * 1.0f;
       hornet->lastHit = lastFrame;
+      hornet->health -= 1;
     }
 
     // Check if hornet's needle hit knight
-    if (CheckAABBCollision(knight->position, knight->modelSize,
+    if (lastFrame > DAMAGE_COOLDOWN + knight->lastHit &&
+        CheckAABBCollision(knight->position, knight->modelSize * 0.8f,
                            hornet->getWeaponPosition(),
-                           hornet->model->weaponSize) &&
-        lastFrame > DAMAGE_COOLDOWN + knight->lastHit) {
-      std::cout << "COLLISIONSS " << lastFrame << std::endl;
-      hornet->position +=
-          glm::normalize(knight->position - hornet->position) * 1.0f;
+                           hornet->model->weaponSize)) {
+      knight->position +=
+          glm::normalize(hornet->position - knight->position) * 1.0f;
+      currentHealth -= 1;
+      playerHealth.setHealth(currentHealth, maxHealth);
       knight->lastHit = lastFrame;
     }
 
-    // camera.LookAt = knight->position;
-
+    glDisable(GL_DEPTH_TEST);
+    simple2dShader.use();
+    glm::mat4 uiProjection =
+        glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT);
+    playerHealth.draw(uiProjection, simple2dShader.ID);
+    glEnable(GL_DEPTH_TEST);
     // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved
     // etc.)
     // -------------------------------------------------------------------------------
@@ -365,9 +423,10 @@ void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
 void mouse_button_callback(GLFWwindow *window, int button, int action,
                            int mods) {
   if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
-    glm::vec3 pos = knight->position + knight->getFront() * 1.0f;
-    float posX = pos.x;
-    float posY = pos.y;
+    // glm::vec3 pos = knight->position + knight->getFront() * 1.0f;
+    // float posX = pos.x;
+    // float posY = pos.y;
+
     // // collision x-axis?
     // bool collisionX = hornet->position.x + hornet->widthX >= posX &&
     //                   posX + knight->widthX >= hornet->position.x;

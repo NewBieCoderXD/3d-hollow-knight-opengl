@@ -174,7 +174,6 @@ public:
         glm::vec3 scale = AssimpGLMHelpers::LerpScale(found.channel, time);
 
         animTransform = glm::translate(animTransform, pos);
-        glm::mat4 rotMat = glm::toMat4(rot);
         animTransform *= glm::toMat4(rot);
         animTransform = glm::scale(animTransform, scale);
         transform = animTransform;
@@ -187,14 +186,14 @@ public:
 
       // std::cout << "mesh name: " << meshes[i].name << " "
       //           << (meshes[i].name == weaponMesh) << std::endl;
-      if (meshes[i].name == "hornet.008") {
-        weaponHitbox->setVisible(true);
-        weaponHitbox->draw(objectModel * transform, hitboxShader);
-      }
-      // if (meshes[i].name == weaponMesh) {
+      // if (meshes[i].name == "hornet.008") {
       //   weaponHitbox->setVisible(true);
       //   weaponHitbox->draw(objectModel * transform, hitboxShader);
       // }
+      if (meshes[i].name == weaponMesh) {
+        weaponHitbox->setVisible(true);
+        weaponHitbox->draw(objectModel * transform, hitboxShader);
+      }
     }
   }
 
@@ -366,7 +365,7 @@ private:
     auto &boneInfoMap = m_BoneInfoMap;
     int &boneCount = m_BoneCounter;
 
-    for (int boneIndex = 0; boneIndex < mesh->mNumBones; ++boneIndex) {
+    for (unsigned int boneIndex = 0; boneIndex < mesh->mNumBones; ++boneIndex) {
       int boneID = -1;
       std::string boneName = mesh->mBones[boneIndex]->mName.C_Str();
       if (boneInfoMap.find(boneName) == boneInfoMap.end()) {
@@ -385,7 +384,7 @@ private:
       int numWeights = mesh->mBones[boneIndex]->mNumWeights;
 
       for (int weightIndex = 0; weightIndex < numWeights; ++weightIndex) {
-        int vertexId = weights[weightIndex].mVertexId;
+        long unsigned int vertexId = weights[weightIndex].mVertexId;
         float weight = weights[weightIndex].mWeight;
         assert(vertexId <= vertices.size());
         SetVertexBoneData(vertices[vertexId], boneID, weight);
