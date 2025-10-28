@@ -12,13 +12,16 @@
 #include <optional>
 #include <vector>
 
+enum class AnimationRunType { FORWARD, BACKWARD, FORWARD_AND_BACKWARD };
+
 class Animator {
 public:
   Animation *m_CurrentAnimation;
   float m_CurrentTime;
   float duration;
   float m_DeltaTime;
-  bool reverse;
+  AnimationRunType type;
+  bool clearAfterDone;
 
   // void setAnimation(Animation *animation, bool reverse) {
   //   m_CurrentTime = 0.0;
@@ -36,10 +39,17 @@ public:
   bool isOver() { return this->m_CurrentTime >= duration; }
 
   float getFrame() {
-    if (reverse) {
+    if (type == AnimationRunType::FORWARD_AND_BACKWARD) {
       return duration / 2.0f - std::abs(m_CurrentTime - duration / 2.0f);
     }
-    return m_CurrentTime;
+    float frame = m_CurrentTime;
+    if (!clearAfterDone && m_CurrentTime > duration) {
+      frame = duration - 0.1f;
+    }
+    if (type == AnimationRunType::BACKWARD) {
+      frame = duration - frame;
+    }
+    return frame;
   }
 
   Animator(Animation *animation) {
@@ -62,12 +72,14 @@ public:
     }
   }
 
-  void PlayAnimation(Animation *pAnimation, bool reverse) {
-    m_CurrentAnimation = pAnimation;
-    m_CurrentTime = 0.0f;
-    duration = pAnimation->m_Duration;
-    this->reverse = reverse;
-    if (reverse) {
+  void PlayAnimation(Animation *pAnimation, AnimationRunType type,
+                     bool clearAfterDone) {
+    this->m_CurrentAnimation = pAnimation;
+    this->m_CurrentTime = 0.0f;
+    this->duration = pAnimation->m_Duration;
+    this->type = type;
+    this->clearAfterDone = clearAfterDone;
+    if (type == AnimationRunType::FORWARD_AND_BACKWARD) {
       duration = 2.0f * pAnimation->m_Duration;
     }
   }
@@ -85,8 +97,9 @@ public:
 
       // Wrap around the animation duration
       timeInTicks = this->getFrame();
-      if (this->m_CurrentTime > this->duration) {
+      if (clearAfterDone && this->m_CurrentTime > this->duration) {
         this->m_CurrentAnimation = nullptr;
+        std::cout << "time over" << std::endl;
       }
     }
     return timeInTicks;

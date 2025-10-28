@@ -114,11 +114,12 @@ public:
       ComputeBoundingBox(scene, node->mChildren[i], min, max, currentTransform);
   }
 
-  void setAnimation(std::string name, bool reverse) {
+  void setAnimation(std::string name, AnimationRunType type,
+                    bool clearAfterDone) {
     auto animationItr = this->nameToAnimation.find(name);
     if (animationItr != this->nameToAnimation.end()) {
       std::cout << "playing animation " << name << std::endl;
-      this->animator.PlayAnimation(&animationItr->second, reverse);
+      this->animator.PlayAnimation(&animationItr->second, type, clearAfterDone);
     } else {
       std::cout << "animation not found" << std::endl;
     }
@@ -157,42 +158,7 @@ public:
     }
   }
 
-  glm::vec3 getWeaponPosition() {
-    return model->weaponPos;
-    // glm::mat4 weaponMtx = glm::translate(glm::mat4(1.0f), position) *
-    //                       glm::toMat4(rotation) *
-    //                       glm::scale(glm::mat4(1.0f), glm::vec3(scale));
-
-    // float timeInTicks = 0.0f;
-    // Animation *foundAnim = animator.GetAnimation();
-    // if (foundAnim != nullptr) {
-    //   // Wrap around the animation duration
-    //   timeInTicks = animator.getFrame();
-    //   if (animator.m_CurrentTime > animator.duration) {
-    //     animator.m_CurrentAnimation = nullptr;
-    //   }
-    // }
-
-    // for (unsigned int i = 0; i < model->meshes.size(); i++) {
-    //   if (model->meshes[i].name != weaponMeshName)
-    //     continue;
-
-    //   glm::mat4 transform = model->meshNodeTransforms[i];
-    //   auto animTrans =
-    //       animator.getMeshTransform(model->weaponMeshIndex, timeInTicks);
-    //   if (animTrans) {
-    //     transform = *animTrans;
-    //   }
-
-    //   weaponMtx *= transform;
-
-    //   // Extract world-space position
-    //   return glm::vec3(weaponMtx[3]);
-    // }
-
-    // // Default if weapon mesh not found
-    // return position;
-  }
+  glm::vec3 getWeaponPosition() { return model->weaponPos; }
 
   glm::vec3 getFront() {
     // The local forward vector (model-space)

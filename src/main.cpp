@@ -75,13 +75,14 @@ const float maxHealth = 5.0;
 float currentHealth = maxHealth;
 
 enum class KnightState { ATTACKING, IDLE };
+KnightState knightState = KnightState::IDLE;
 float lastKnightStateSet = 0.0f;
 
 void randomHornetState() {
   if (hornetState == HornetState::DEAD) {
     return;
   }
-  if (glm::length(hornet->position - knight->position) < 4.0) {
+  if (glm::length(hornet->position - knight->position) < 6.0) {
     int action = (std::rand() % 3);
     // hornetState = static_cast<HornetState>(action);
     switch (action) {
@@ -120,7 +121,7 @@ void randomHornetState() {
   case HornetState::DASH_WAIT: {
     hornet->rotation = glm::quat_cast(rotationMatrix);
     ma_engine_play_sound(&engine, "resources/audio/shaw.mp3", NULL);
-    hornet->setAnimation("point_forward", false);
+    hornet->setAnimation("point_forward", AnimationRunType::FORWARD, false);
     lastHornetStateSet = lastFrame;
     break;
   }
@@ -137,13 +138,15 @@ void updateHornetState() {
   case HornetState::LUNGE_WAIT: {
     if (lastFrame > lastHornetStateSet + 1.0f) {
       hornetState = HornetState::LUNGE;
-      hornet->setAnimation("lunge", true);
+      hornet->setAnimation("lunge", AnimationRunType::FORWARD_AND_BACKWARD,
+                           true);
       lastHornetStateSet = lastFrame;
     }
     break;
   }
   case HornetState::LUNGE: {
     if (hornet->animator.isOver() && lastFrame > lastHornetStateSet + 3.0f) {
+      hornet->setAnimation("point_forward", AnimationRunType::BACKWARD, true);
       hornetState = HornetState::IDLE;
     }
     break;
@@ -338,7 +341,8 @@ int main() {
     }
 
     // Check if knight's nail hit hornet
-    if (lastFrame > DAMAGE_COOLDOWN + hornet->lastHit &&
+    if (lastFrame > KNIGHT_ATTACK_DELAY + lastKnightStateSet &&
+        lastFrame > DAMAGE_COOLDOWN + hornet->lastHit &&
         CheckAABBCollision(knight->getWeaponPosition(),
                            knight->model->weaponSize * 2.0f, hornet->position,
                            hornet->modelSize * 2.0f)) {
@@ -435,7 +439,10 @@ void mouse_button_callback(GLFWwindow *window, int button, int action,
                            int mods) {
   if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS &&
       lastFrame >= lastKnightStateSet + KNIGHT_ATTACK_DELAY) {
-    knight->setAnimation("Knight_NailAction", true);
+    lastKnightStateSet = lastFrame;
+    knightState = KnightState::ATTACKING;
+    knight->setAnimation("Knight_NailAction",
+                         AnimationRunType::FORWARD_AND_BACKWARD, true);
   }
 }
 
