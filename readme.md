@@ -12,7 +12,7 @@ vcpkg install
 
 # Demo
 
-[Loading video](https://github.com/NewBieCoderXD/3d-hollow-knight-opengl/raw/refs/heads/main/readme/2025-10-27%2022-01-15.mkv)
+<video src="readme/demo.mp4" controls width="600"></video>
 
 # Acknowledgements
 
