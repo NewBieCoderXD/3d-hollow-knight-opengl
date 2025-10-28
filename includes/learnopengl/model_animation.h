@@ -3,7 +3,9 @@
 
 #include "assimp/vector3.h"
 #include "glm/ext/matrix_float4x4.hpp"
+#include "glm/ext/matrix_transform.hpp"
 #include "glm/fwd.hpp"
+#include "learnopengl/animator.h"
 #include "learnopengl/bone.h"
 #include "learnopengl/box.hpp"
 #include <assimp/anim.h>
@@ -33,11 +35,11 @@
 
 using namespace std;
 
-struct MeshAnimationChannel {
-  aiNode *node;
-  aiNodeAnim *channel;
-  glm::mat4 mTransform;
-};
+// struct MeshAnimationChannel {
+//   aiNode *node;
+//   aiNodeAnim *channel;
+//   glm::mat4 mTransform;
+// };
 static const std::vector<std::pair<aiTextureType, std::string>> textureTypes = {
     {aiTextureType_DIFFUSE, "texture_diffuse"},
     {aiTextureType_SPECULAR, "texture_specular"},
@@ -70,9 +72,11 @@ public:
   bool gammaCorrection;
   string weaponMesh = "";
   glm::vec3 weaponSize = glm::vec3(0.0f);
+  glm::vec3 weaponPos = glm::vec3(0.0f);
   std::unique_ptr<DebugBox> weaponHitbox;
-  std::vector<MeshAnimationChannel> meshAnimationCache;
-  bool showHitbox = false;
+  std::string currentAnim;
+
+  unsigned int weaponMeshIndex = 0;
 
   // constructor, expects a filepath to a 3D model.
   Model(string const &path, bool gamma = false) : gammaCorrection(gamma) {
@@ -92,13 +96,11 @@ public:
     processNode(scene->mRootNode, scene);
     std::cout << "Number of meshes: " << meshes.size() << std::endl;
 
-    meshAnimationCache.resize(meshes.size());
-
-    if (scene->mNumAnimations > 0) {
-      aiAnimation *animation =
-          scene->mAnimations[0]; // pick first animation for now
-      BuildMeshAnimationCache(scene, animation);
-    }
+    // for (unsigned int i = 0; i < scene->mNumAnimations; i++) {
+    //   aiAnimation *animation = scene->mAnimations[0];
+    //   std::vector<MeshAnimationChannel> meshAnimation(meshes.size());
+    //   // BuildMeshAnimationCache(scene, animation, meshAnimation);
+    // }
   }
 
   void computeMeshSize(aiMesh *mesh, glm::mat4 nodeTransform, aiVector3D &min,
@@ -137,62 +139,50 @@ public:
     return nullptr;
   }
 
-  void BuildMeshAnimationCache(const aiScene *scene,
-                               const aiAnimation *animation) {
-    for (unsigned int meshIndex = 0; meshIndex < scene->mNumMeshes;
-         ++meshIndex) {
-      aiNode *node = FindNodeForMesh(scene->mRootNode, meshIndex);
-      if (!node)
-        continue;
+  // void
+  // BuildMeshAnimationCache(const aiScene *scene, const aiAnimation *animation,
+  //                         std::vector<MeshAnimationChannel> &meshAnimation) {
+  //   for (unsigned int meshIndex = 0; meshIndex < scene->mNumMeshes;
+  //        ++meshIndex) {
+  //     aiNode *node = FindNodeForMesh(scene->mRootNode, meshIndex);
+  //     if (!node)
+  //       continue;
 
-      aiNodeAnim *channel = nullptr;
-      for (unsigned int i = 0; i < animation->mNumChannels; i++) {
-        if (animation->mChannels[i]->mNodeName == node->mName) {
-          channel = animation->mChannels[i];
-          break;
-        }
-      }
+  //     aiNodeAnim *channel = nullptr;
+  //     for (unsigned int i = 0; i < animation->mNumChannels; i++) {
+  //       if (animation->mChannels[i]->mNodeName == node->mName) {
+  //         channel = animation->mChannels[i];
+  //         break;
+  //       }
+  //     }
 
-      glm::mat4 transform =
-          AssimpGLMHelpers::ConvertMatrixToGLMFormat(node->mTransformation);
+  //     glm::mat4 transform =
+  //         AssimpGLMHelpers::ConvertMatrixToGLMFormat(node->mTransformation);
 
-      meshAnimationCache[meshIndex] = {node, channel, transform};
-    }
-  }
+  //     meshAnimation[meshIndex] = {node, channel, transform};
+  //   }
+  // }
 
   // draws the model, and thus all its meshes
   void Draw(glm::mat4 objectModel, Shader &shader, Shader &hitboxShader,
-            float time, bool showHitbox) {
+            Animator &animator, float timeInTicks, bool showHitbox) {
     for (unsigned int i = 0; i < meshes.size(); i++) {
       glm::mat4 transform = meshNodeTransforms[i];
-
-      MeshAnimationChannel found = meshAnimationCache[i];
-      glm::mat4 animTransform = glm::mat4(1.0f);
-      if (found.channel != nullptr) {
-        glm::vec3 pos = AssimpGLMHelpers::LerpPosition(found.channel, time);
-        glm::quat rot = AssimpGLMHelpers::SlerpRotation(found.channel, time);
-        glm::vec3 scale = AssimpGLMHelpers::LerpScale(found.channel, time);
-
-        animTransform = glm::translate(animTransform, pos);
-        animTransform *= glm::toMat4(rot);
-        animTransform = glm::scale(animTransform, scale);
-        transform = animTransform;
+      std::optional<glm::mat4> animTrans =
+          animator.getMeshTransform(i, timeInTicks);
+      if (animTrans.has_value()) {
+        transform = *animTrans;
       }
-      // std::cout << glm::to_string(found.mTransform) << std::endl;
-      shader.setMat4("model", objectModel * transform);
+      glm::mat4 finalTransform = objectModel * transform;
+      shader.setMat4("model", finalTransform);
 
-      // std::cout << "name " << meshes[i].name << std::endl;
       meshes[i].Draw(shader);
 
-      // std::cout << "mesh name: " << meshes[i].name << " "
-      //           << (meshes[i].name == weaponMesh) << std::endl;
-      // if (meshes[i].name == "hornet.008") {
-      //   weaponHitbox->setVisible(true);
-      //   weaponHitbox->draw(objectModel * transform, hitboxShader);
-      // }
-      if (meshes[i].name == weaponMesh) {
+      if (i == weaponMeshIndex && showHitbox && weaponHitbox != nullptr) {
+        weaponPos = glm::vec3(finalTransform[3]);
         weaponHitbox->setVisible(true);
-        weaponHitbox->draw(objectModel * transform, hitboxShader);
+        weaponHitbox->draw(glm::translate(glm::mat4(1.0f), weaponPos),
+                           hitboxShader);
       }
     }
   }
@@ -256,6 +246,8 @@ private:
         weaponHitbox = std::make_unique<DebugBox>(
             glm::vec3(weaponMin.x, weaponMin.y, weaponMin.z),
             glm::vec3(weaponMax.x, weaponMax.y, weaponMax.z));
+
+        weaponMeshIndex = meshes.size();
       }
 
       meshes.push_back(processMesh(mesh, scene));

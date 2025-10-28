@@ -4,3 +4,4 @@ const float HORNET_ATTACK_COOLDOWN = 3.0f;
 const float HORNET_DASH_SPEED = 30.0f;
 const float HORNET_SPEED = 0.5f;
 const float KNIGHT_SPEED = 4.0f;
+const float KNIGHT_ATTACK_DELAY = 3.0f;

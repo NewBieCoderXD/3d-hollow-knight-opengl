@@ -1,11 +1,15 @@
 #pragma once
 
+#define GLM_ENABLE_EXPERIMENTAL
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
+#include <cstddef>
 #include <glm/glm.hpp>
+#include <glm/gtx/string_cast.hpp>
 #include <learnopengl/animation.h>
 #include <learnopengl/bone.h>
 #include <map>
+#include <optional>
 #include <vector>
 
 class Animator {
@@ -15,7 +19,6 @@ public:
   float duration;
   float m_DeltaTime;
   bool reverse;
-  bool isRevesing;
 
   // void setAnimation(Animation *animation, bool reverse) {
   //   m_CurrentTime = 0.0;
@@ -67,6 +70,47 @@ public:
     if (reverse) {
       duration = 2.0f * pAnimation->m_Duration;
     }
+  }
+
+  float updateTime(float deltaTime) {
+    float timeInTicks = deltaTime;
+    if (m_CurrentAnimation != nullptr) {
+      float ticksPerSecond = m_CurrentAnimation->m_TicksPerSecond != 0
+                                 ? m_CurrentAnimation->m_TicksPerSecond
+                                 : 25.0f;
+      // float ticksPerSecond = 50.0f;
+
+      // Accumulate animation time internally
+      this->m_CurrentTime += deltaTime * ticksPerSecond;
+
+      // Wrap around the animation duration
+      timeInTicks = this->getFrame();
+      if (this->m_CurrentTime > this->duration) {
+        this->m_CurrentAnimation = nullptr;
+      }
+    }
+    return timeInTicks;
+  }
+
+  std::optional<glm::mat4> getMeshTransform(unsigned int meshIndex,
+                                            float timeInTicks) {
+    if (!m_CurrentAnimation) {
+      return std::nullopt;
+    }
+
+    aiNodeAnim *channel = m_CurrentAnimation->meshToChannel[meshIndex].channel;
+    if (!channel)
+      return std::nullopt;
+
+    glm::vec3 pos = AssimpGLMHelpers::LerpPosition(channel, timeInTicks);
+    glm::quat rot = AssimpGLMHelpers::SlerpRotation(channel, timeInTicks);
+    glm::vec3 scale = AssimpGLMHelpers::LerpScale(channel, timeInTicks);
+
+    glm::mat4 transform = glm::translate(glm::mat4(1.0f), pos);
+    transform *= glm::toMat4(rot);
+    transform = glm::scale(transform, scale);
+
+    return transform;
   }
 
   void CalculateBoneTransform(const AssimpNodeData *node,

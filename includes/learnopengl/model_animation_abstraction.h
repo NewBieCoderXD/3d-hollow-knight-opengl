@@ -1,5 +1,6 @@
 
 #include "../constants.cpp"
+#include "assimp/anim.h"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/ext/vector_float3.hpp"
 #include "learnopengl/animation.h"
@@ -23,12 +24,12 @@ public:
   float health = 5.0f;
   float maxHealth = 5.0f;
 
-  std::string weaponMesh = "";
+  std::string weaponMeshName = "";
 
   float lastHit = 0.0f;
   std::unique_ptr<DebugBox> hitbox;
   // std::unique_ptr<DebugBox> weaponHitbox;
-  const bool showHitbox = false;
+  const bool showHitbox = true;
 
   Animator animator;
   const aiScene *scene;
@@ -36,7 +37,7 @@ public:
   ModelAnimationAbs(Assimp::Importer &importer, const std::string &path,
                     std::string weaponMesh, bool gamma = false)
       : animator(NULL) {
-    this->weaponMesh = weaponMesh;
+    this->weaponMeshName = weaponMesh;
 
     if (!showHitbox) {
       weaponMesh = "";
@@ -65,8 +66,21 @@ public:
       const char *name = anim->mName.C_Str();
       std::cout << "Found action " << name << std::endl;
       this->nameToAnimation.insert(
-          {string(name), Animation(*scene, anim, name, this->model.get())});
+          {string(name), Animation(*scene, anim, name)});
     }
+  }
+
+  std::map<std::string, aiNodeAnim *> BuildMeshToChannel(aiAnimation *anim) {
+    std::map<std::string, aiNodeAnim *> meshToChannel;
+
+    for (unsigned int i = 0; i < anim->mNumChannels; i++) {
+      aiNodeAnim *channel = anim->mChannels[i];
+      std::string nodeName = channel->mNodeName.C_Str();
+
+      meshToChannel[nodeName] = {channel};
+    }
+
+    return meshToChannel;
   }
 
   void ComputeBoundingBox(const aiScene *scene, const aiNode *node,
@@ -110,7 +124,7 @@ public:
     }
   }
 
-  void draw(glm::mat4 modelMtx, Shader &shader, Shader &hitboxShader,
+  void draw(glm::mat4 parentMtx, Shader &shader, Shader &hitboxShader,
             float deltaTime, float lastFrame) {
     if (health < 0) {
       return;
@@ -126,80 +140,58 @@ public:
       glUniform1i(isHitLocation, false);
     }
 
-    modelMtx = glm::translate(modelMtx, position);
+    glm::mat4 modelMtx = glm::translate(parentMtx, position);
     modelMtx *= glm::toMat4(rotation);
     modelMtx = glm::scale(modelMtx, glm::vec3(scale));
 
-    float timeInTicks = deltaTime;
-
-    Animation *foundAnim = animator.GetAnimation();
-    if (foundAnim != nullptr) {
-      float ticksPerSecond = foundAnim->m_TicksPerSecond != 0
-                                 ? foundAnim->m_TicksPerSecond
-                                 : 25.0f;
-      // float ticksPerSecond = 50.0f;
-
-      // Accumulate animation time internally
-      animator.m_CurrentTime += deltaTime * ticksPerSecond;
-
-      // Wrap around the animation duration
-      timeInTicks = animator.getFrame();
-      if (animator.m_CurrentTime > animator.duration) {
-        animator.m_CurrentAnimation = nullptr;
-      }
-    }
-    model->Draw(modelMtx, shader, hitboxShader, timeInTicks, showHitbox);
+    float timeInTicks = animator.updateTime(deltaTime);
+    // if (weaponMesh == "hornet.008") {
+    //   std::cout << "anim" << animator.GetAnimation() << std::endl;
+    // }
+    model->Draw(modelMtx, shader, hitboxShader, animator, timeInTicks,
+                showHitbox);
     if (showHitbox) {
+      glm::vec3 pos = glm::vec3(modelMtx[3]);
       hitbox->setVisible(true);
-      hitbox->draw(modelMtx, hitboxShader);
+      hitbox->draw(glm::translate(glm::mat4(1.0f), pos), hitboxShader);
     }
   }
 
   glm::vec3 getWeaponPosition() {
-    glm::mat4 weaponMtx = glm::translate(glm::mat4(1.0f), position) *
-                          glm::toMat4(rotation) *
-                          glm::scale(glm::mat4(1.0f), glm::vec3(scale));
+    return model->weaponPos;
+    // glm::mat4 weaponMtx = glm::translate(glm::mat4(1.0f), position) *
+    //                       glm::toMat4(rotation) *
+    //                       glm::scale(glm::mat4(1.0f), glm::vec3(scale));
 
-    float timeInTicks = 0.0f;
-    Animation *foundAnim = animator.GetAnimation();
-    if (foundAnim != nullptr) {
-      // Wrap around the animation duration
-      timeInTicks = animator.getFrame();
-      if (animator.m_CurrentTime > animator.duration) {
-        animator.m_CurrentAnimation = nullptr;
-      }
-    }
+    // float timeInTicks = 0.0f;
+    // Animation *foundAnim = animator.GetAnimation();
+    // if (foundAnim != nullptr) {
+    //   // Wrap around the animation duration
+    //   timeInTicks = animator.getFrame();
+    //   if (animator.m_CurrentTime > animator.duration) {
+    //     animator.m_CurrentAnimation = nullptr;
+    //   }
+    // }
 
-    for (unsigned int i = 0; i < model->meshes.size(); i++) {
-      if (model->meshes[i].name != weaponMesh)
-        continue;
+    // for (unsigned int i = 0; i < model->meshes.size(); i++) {
+    //   if (model->meshes[i].name != weaponMeshName)
+    //     continue;
 
-      glm::mat4 transform = model->meshNodeTransforms[i];
-      MeshAnimationChannel channel = model->meshAnimationCache[i];
+    //   glm::mat4 transform = model->meshNodeTransforms[i];
+    //   auto animTrans =
+    //       animator.getMeshTransform(model->weaponMeshIndex, timeInTicks);
+    //   if (animTrans) {
+    //     transform = *animTrans;
+    //   }
 
-      if (channel.channel != nullptr && foundAnim != nullptr) {
-        glm::vec3 animPos =
-            AssimpGLMHelpers::LerpPosition(channel.channel, timeInTicks);
-        glm::quat animRot =
-            AssimpGLMHelpers::SlerpRotation(channel.channel, timeInTicks);
-        glm::vec3 animScale =
-            AssimpGLMHelpers::LerpScale(channel.channel, timeInTicks);
+    //   weaponMtx *= transform;
 
-        glm::mat4 animTransform = glm::translate(glm::mat4(1.0f), animPos) *
-                                  glm::toMat4(animRot) *
-                                  glm::scale(glm::mat4(1.0f), animScale);
+    //   // Extract world-space position
+    //   return glm::vec3(weaponMtx[3]);
+    // }
 
-        transform = animTransform;
-      }
-
-      weaponMtx *= transform;
-
-      // Extract world-space position
-      return glm::vec3(weaponMtx[3]);
-    }
-
-    // Default if weapon mesh not found
-    return position;
+    // // Default if weapon mesh not found
+    // return position;
   }
 
   glm::vec3 getFront() {

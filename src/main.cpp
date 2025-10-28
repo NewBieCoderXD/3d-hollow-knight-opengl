@@ -65,20 +65,109 @@ inline bool CheckAABBCollision(const glm::vec3 &posA, const glm::vec3 &sizeA,
   return collisionX && collisionY && collisionZ;
 }
 
-enum HornetState {
-  LUNGE_WAIT,
-  LUNGE,
-  DASH_WAIT,
-  DASH,
-  IDLE,
-};
+enum class HornetState { LUNGE_WAIT, LUNGE, DASH_WAIT, DASH, IDLE, DEAD };
 
-HornetState hornetState = IDLE;
+HornetState hornetState = HornetState::IDLE;
 float lastHornetStateSet = 0.0f;
 float lastHornetAttack = 0.0f;
 
 const float maxHealth = 5.0;
 float currentHealth = maxHealth;
+
+enum class KnightState { ATTACKING, IDLE };
+float lastKnightStateSet = 0.0f;
+
+void randomHornetState() {
+  if (hornetState == HornetState::DEAD) {
+    return;
+  }
+  if (glm::length(hornet->position - knight->position) < 4.0) {
+    int action = (std::rand() % 3);
+    // hornetState = static_cast<HornetState>(action);
+    switch (action) {
+    case 0:
+      hornetState = HornetState::LUNGE_WAIT;
+      break;
+    case 1:
+      hornetState = HornetState::LUNGE_WAIT;
+      break;
+    case 2:
+      hornetState = HornetState::DASH_WAIT;
+      break;
+    }
+  } else {
+    hornetState = HornetState::DASH_WAIT;
+  }
+  lastHornetAttack = lastFrame;
+  // hornetState = HornetState::LUNGE_WAIT;
+
+  glm::mat4 lookAtMatrix = glm::lookAt(hornet->position, knight->position,
+                                       glm::vec3(0.0f, 1.0f, 0.0f));
+  glm::mat3 rotationMatrix = glm::mat3(glm::transpose(lookAtMatrix));
+
+  switch (hornetState) {
+  case HornetState::LUNGE_WAIT: {
+    hornet->rotation = glm::quat_cast(rotationMatrix);
+    ma_engine_play_sound(&engine, "resources/audio/shaw.mp3", NULL);
+    lastHornetStateSet = lastFrame;
+    break;
+  }
+  case HornetState::IDLE:
+  case HornetState::DEAD:
+  case HornetState::LUNGE: {
+    break;
+  }
+  case HornetState::DASH_WAIT: {
+    hornet->rotation = glm::quat_cast(rotationMatrix);
+    ma_engine_play_sound(&engine, "resources/audio/shaw.mp3", NULL);
+    hornet->setAnimation("point_forward", false);
+    lastHornetStateSet = lastFrame;
+    break;
+  }
+  case HornetState::DASH: {
+    hornet->rotation = glm::quat_cast(rotationMatrix);
+    break;
+  }
+  }
+  lastHornetAttack = lastFrame;
+}
+
+void updateHornetState() {
+  switch (hornetState) {
+  case HornetState::LUNGE_WAIT: {
+    if (lastFrame > lastHornetStateSet + 1.0f) {
+      hornetState = HornetState::LUNGE;
+      hornet->setAnimation("lunge", true);
+      lastHornetStateSet = lastFrame;
+    }
+    break;
+  }
+  case HornetState::LUNGE: {
+    if (hornet->animator.isOver() && lastFrame > lastHornetStateSet + 3.0f) {
+      hornetState = HornetState::IDLE;
+    }
+    break;
+  }
+  case HornetState::DASH_WAIT: {
+    if (lastFrame > lastHornetStateSet + 1.0f) {
+      hornetState = HornetState::DASH;
+      lastHornetStateSet = lastFrame;
+    }
+    break;
+  }
+  case HornetState::DASH: {
+    hornet->position -= hornet->getFront() * HORNET_DASH_SPEED * deltaTime;
+    if (lastFrame > lastHornetStateSet + 0.6f) {
+      hornetState = HornetState::IDLE;
+      lastHornetStateSet = lastFrame;
+    }
+    break;
+  }
+  case HornetState::DEAD:
+  case HornetState::IDLE:
+    break;
+  }
+}
 
 int main() {
   // glfw: initialize and configure
@@ -231,92 +320,11 @@ int main() {
     stoneGround.draw(model, texturedModelShader, simple3dShader, deltaTime,
                      lastFrame);
 
-    if (hornetState == IDLE &&
+    if (hornetState == HornetState::IDLE &&
         lastFrame > lastHornetAttack + HORNET_ATTACK_COOLDOWN) {
-
-      if (glm::length(hornet->position - knight->position) < 4.0) {
-        int action = (std::rand() % 3);
-        // hornetState = static_cast<HornetState>(action);
-        switch (action) {
-        case 0:
-          hornetState = LUNGE_WAIT;
-          break;
-        case 1:
-          hornetState = LUNGE_WAIT;
-          break;
-        case 2:
-          hornetState = DASH_WAIT;
-          break;
-        }
-      } else {
-        hornetState = DASH_WAIT;
-      }
-      // hornetState = LUNGE_WAIT;
-
-      glm::mat4 lookAtMatrix = glm::lookAt(hornet->position, knight->position,
-                                           glm::vec3(0.0f, 1.0f, 0.0f));
-      glm::mat3 rotationMatrix = glm::mat3(glm::transpose(lookAtMatrix));
-
-      switch (hornetState) {
-      case LUNGE_WAIT: {
-        hornet->rotation = glm::quat_cast(rotationMatrix);
-        ma_engine_play_sound(&engine, "resources/audio/shaw.mp3", NULL);
-        lastHornetStateSet = lastFrame;
-        break;
-      }
-      case LUNGE: {
-        break;
-      }
-      case DASH_WAIT: {
-        hornet->rotation = glm::quat_cast(rotationMatrix);
-        ma_engine_play_sound(&engine, "resources/audio/shaw.mp3", NULL);
-        hornet->setAnimation("point_forward", false);
-        lastHornetStateSet = lastFrame;
-        break;
-      }
-      case DASH: {
-        hornet->rotation = glm::quat_cast(rotationMatrix);
-        break;
-      }
-      case IDLE:
-        break;
-      }
-      lastHornetAttack = lastFrame;
+      randomHornetState();
     }
-
-    switch (hornetState) {
-    case LUNGE_WAIT: {
-      if (lastFrame > lastHornetStateSet + 1.0f) {
-        hornetState = LUNGE;
-        hornet->setAnimation("point_forward", true);
-        lastHornetStateSet = lastFrame;
-      }
-      break;
-    }
-    case LUNGE: {
-      if (hornet->animator.isOver() && lastFrame > lastHornetStateSet + 3.0f) {
-        hornetState = IDLE;
-      }
-      break;
-    }
-    case DASH_WAIT: {
-      if (lastFrame > lastHornetStateSet + 1.0f) {
-        hornetState = DASH;
-        lastHornetStateSet = lastFrame;
-      }
-      break;
-    }
-    case DASH: {
-      hornet->position -= hornet->getFront() * HORNET_DASH_SPEED * deltaTime;
-      if (lastFrame > lastHornetStateSet + 0.6f) {
-        hornetState = IDLE;
-        lastHornetStateSet = lastFrame;
-      }
-      break;
-    }
-    case IDLE:
-      break;
-    }
+    updateHornetState();
 
     // Check if knight body hit hornet
     if (lastFrame > DAMAGE_COOLDOWN + knight->lastHit &&
@@ -334,7 +342,7 @@ int main() {
         CheckAABBCollision(knight->getWeaponPosition(),
                            knight->model->weaponSize * 2.0f, hornet->position,
                            hornet->modelSize * 2.0f)) {
-      std::cout << "HIT " << lastFrame << std::endl;
+      // std::cout << "HIT " << lastFrame << std::endl;
       hornet->position +=
           glm::normalize(hornet->position - knight->position) * 1.0f;
       hornet->lastHit = lastFrame;
@@ -425,27 +433,8 @@ void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
 
 void mouse_button_callback(GLFWwindow *window, int button, int action,
                            int mods) {
-  if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
-    // glm::vec3 pos = knight->position + knight->getFront() * 1.0f;
-    // float posX = pos.x;
-    // float posY = pos.y;
-
-    // // collision x-axis?
-    // bool collisionX = hornet->position.x + hornet->widthX >= posX &&
-    //                   posX + knight->widthX >= hornet->position.x;
-    // // collision y-axis?
-    // bool collisionY = hornet->position.y + hornet->widthZ >= posY &&
-    //                   posY + knight->widthZ >= hornet->position.y;
-
-    // std::cout << posX << " hornet x: " << hornet->position.x << " width "
-    //           << knight->width << std::endl;
-    // std::cout << posY << " hornet x: " << hornet->position.y << " height "
-    //           << knight->height << std::endl;
-    // std::cout << collisionX << " " << collisionY << std::endl;
-    // collision only if on both axes
-    // if (collisionX && collisionY) {
-    //   hornet->lastHit = lastFrame;
-    // }
+  if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS &&
+      lastFrame >= lastKnightStateSet + KNIGHT_ATTACK_DELAY) {
     knight->setAnimation("Knight_NailAction", true);
   }
 }
