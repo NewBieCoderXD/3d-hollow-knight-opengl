@@ -83,19 +83,20 @@ void randomHornetState() {
     return;
   }
   if (glm::length(hornet->position - knight->position) < 6.0) {
-    int action = (std::rand() % 3);
+    // int action = (std::rand() % 3);
     // hornetState = static_cast<HornetState>(action);
-    switch (action) {
-    case 0:
-      hornetState = HornetState::LUNGE_WAIT;
-      break;
-    case 1:
-      hornetState = HornetState::LUNGE_WAIT;
-      break;
-    case 2:
-      hornetState = HornetState::DASH_WAIT;
-      break;
-    }
+    hornetState = HornetState::LUNGE_WAIT;
+    // switch (action) {
+    // case 0:
+    //   hornetState = HornetState::LUNGE_WAIT;
+    //   break;
+    // case 1:
+    //   hornetState = HornetState::LUNGE_WAIT;
+    //   break;
+    // case 2:
+    //   hornetState = HornetState::DASH_WAIT;
+    //   break;
+    // }
   } else {
     hornetState = HornetState::DASH_WAIT;
   }
@@ -172,6 +173,19 @@ void updateHornetState() {
   }
 }
 
+void updateKnightState() {
+  switch (knightState) {
+  case KnightState::ATTACKING: {
+    if (lastFrame > KNIGHT_ATTACK_DELAY + lastKnightStateSet) {
+      knightState = KnightState::IDLE;
+    }
+    break;
+  }
+  default:
+    break;
+  }
+}
+
 int main() {
   // glfw: initialize and configure
   // ------------------------------
@@ -207,17 +221,15 @@ int main() {
   glfwSetCursorPosCallback(window, mouse_callback);
   glfwSetScrollCallback(window, scroll_callback);
 
-  // tell GLFW to capture our mouse
-  glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
-  glfwSetMouseButtonCallback(window, mouse_button_callback);
-
   // glad: load all OpenGL function pointers
   // ---------------------------------------
   if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
     std::cout << "Failed to initialize GLAD" << std::endl;
     return -1;
   }
+
+  glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
+  glfwSwapBuffers(window);
 
   // configure global opengl state
   // -----------------------------
@@ -236,6 +248,9 @@ int main() {
   // -------------------------
   Shader texturedModelShader("src/texturedModel.vert",
                              "src/texturedModel.frag");
+
+  Shader texturedModelWithBonesShader("src/texturedModelWithBones.vert",
+                                      "src/texturedModelWithBones.frag");
 
   Shader simple3dShader("src/simple3d.vert", "src/simple3d.frag");
 
@@ -256,8 +271,7 @@ int main() {
                  "Knight_Nail");
 
   Assimp::Importer hornetImporter;
-  hornet.emplace(hornetImporter,
-                 "resources/hollow-knight-hornet/source/hornet-v2.glb",
+  hornet.emplace(hornetImporter, "resources/hollow-knight-hornet/hornet1.gltf",
                  "hornet.008");
   hornet->position.x = 3.0f;
   hornet->scale = 2.5f;
@@ -269,6 +283,11 @@ int main() {
 
   HealthBar playerHealth(200.0f, 20.0f, glm::vec2(10.0f, 10.0f),
                          glm::vec3(1.0f, 0.0f, 0.0f));
+
+  // tell GLFW to capture our mouse
+  glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+  glfwSetMouseButtonCallback(window, mouse_button_callback);
 
   // draw in wireframe
   // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -295,39 +314,43 @@ int main() {
     glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // don't forget to enable shader before setting uniforms
-    texturedModelShader.use();
-
     // view/projection transformations
     glm::mat4 projection =
         glm::perspective(glm::radians(camera.Zoom),
                          (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
     glm::mat4 view = camera.GetViewMatrix();
+
+    texturedModelWithBonesShader.use();
+    texturedModelWithBonesShader.setMat4("projection", projection);
+    texturedModelWithBonesShader.setMat4("view", view);
+
+    texturedModelShader.use();
     texturedModelShader.setMat4("projection", projection);
     texturedModelShader.setMat4("view", view);
 
     simple3dShader.use();
     simple3dShader.setMat4("projection", projection);
     simple3dShader.setMat4("view", view);
-    ground.Draw(simple3dShader);
+    // ground.Draw(simple3dShader);
 
     // render the loaded model
     glm::mat4 model = glm::mat4(1.0f);
-    knight->draw(model, texturedModelShader, simple3dShader, deltaTime,
+    knight->draw(model, texturedModelWithBonesShader, simple3dShader, deltaTime,
                  lastFrame);
 
     model = glm::mat4(1.0f);
-    hornet->draw(model, texturedModelShader, simple3dShader, deltaTime,
+    hornet->draw(model, texturedModelWithBonesShader, simple3dShader, deltaTime,
                  lastFrame);
 
-    stoneGround.draw(model, texturedModelShader, simple3dShader, deltaTime,
-                     lastFrame);
+    stoneGround.draw(model, texturedModelWithBonesShader, simple3dShader,
+                     deltaTime, lastFrame);
 
     if (hornetState == HornetState::IDLE &&
         lastFrame > lastHornetAttack + HORNET_ATTACK_COOLDOWN) {
       randomHornetState();
     }
     updateHornetState();
+    updateKnightState();
 
     // Check if knight body hit hornet
     if (lastFrame > DAMAGE_COOLDOWN + knight->lastHit &&
@@ -341,7 +364,7 @@ int main() {
     }
 
     // Check if knight's nail hit hornet
-    if (lastFrame > KNIGHT_ATTACK_DELAY + lastKnightStateSet &&
+    if (knightState == KnightState::ATTACKING &&
         lastFrame > DAMAGE_COOLDOWN + hornet->lastHit &&
         CheckAABBCollision(knight->getWeaponPosition(),
                            knight->model->weaponSize * 2.0f, hornet->position,

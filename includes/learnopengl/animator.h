@@ -1,11 +1,9 @@
 #pragma once
 
-#define GLM_ENABLE_EXPERIMENTAL
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <cstddef>
 #include <glm/glm.hpp>
-#include <glm/gtx/string_cast.hpp>
 #include <learnopengl/animation.h>
 #include <learnopengl/bone.h>
 #include <map>
@@ -22,6 +20,7 @@ public:
   float m_DeltaTime;
   AnimationRunType type;
   bool clearAfterDone;
+  std::map<std::string, MeshAnimationChannel> m_BoneInfo;
 
   // void setAnimation(Animation *animation, bool reverse) {
   //   m_CurrentTime = 0.0;
@@ -62,15 +61,16 @@ public:
       m_FinalBoneMatrices.push_back(glm::mat4(1.0f));
   }
 
-  void UpdateAnimation(float dt) {
-    m_DeltaTime = dt;
-    if (m_CurrentAnimation) {
-      m_CurrentTime += m_CurrentAnimation->GetTicksPerSecond() * dt;
-      m_CurrentTime = fmod(m_CurrentTime, m_CurrentAnimation->GetDuration());
-      CalculateBoneTransform(&m_CurrentAnimation->GetRootNode(),
-                             glm::mat4(1.0f));
-    }
-  }
+  // Use updateTimeAndAnim instead
+  // void UpdateAnimation(float dt) {
+  //   m_DeltaTime = dt;
+  //   if (m_CurrentAnimation) {
+  //     m_CurrentTime += m_CurrentAnimation->GetTicksPerSecond() * dt;
+  //     m_CurrentTime = fmod(m_CurrentTime, m_CurrentAnimation->GetDuration());
+  //     CalculateBoneTransform(&m_CurrentAnimation->GetRootNode(),
+  //                            glm::mat4(1.0f));
+  //   }
+  // }
 
   void PlayAnimation(Animation *pAnimation, AnimationRunType type,
                      bool clearAfterDone) {
@@ -79,12 +79,22 @@ public:
     this->duration = pAnimation->m_Duration;
     this->type = type;
     this->clearAfterDone = clearAfterDone;
+    m_BoneInfo.clear();
+    for (unsigned int i = 0; i < pAnimation->meshToChannel.size(); ++i) {
+      const MeshAnimationChannel &meshChannel = pAnimation->meshToChannel[i];
+
+      if (meshChannel.channel) {
+        // Use the node name of the channel as key
+        std::string boneName = meshChannel.node->mName.C_Str();
+        m_BoneInfo[boneName] = meshChannel;
+      }
+    }
     if (type == AnimationRunType::FORWARD_AND_BACKWARD) {
       duration = 2.0f * pAnimation->m_Duration;
     }
   }
 
-  float updateTime(float deltaTime) {
+  float updateTimeAndAnim(float deltaTime) {
     float timeInTicks = deltaTime;
     if (m_CurrentAnimation != nullptr) {
       float ticksPerSecond = m_CurrentAnimation->m_TicksPerSecond != 0
@@ -100,6 +110,10 @@ public:
       if (clearAfterDone && this->m_CurrentTime > this->duration) {
         this->m_CurrentAnimation = nullptr;
         std::cout << "time over" << std::endl;
+        CalculateBoneTransform(nullptr, glm::mat4(1.0f));
+      } else {
+        CalculateBoneTransform(&m_CurrentAnimation->GetRootNode(),
+                               glm::mat4(1.0f));
       }
     }
     return timeInTicks;
@@ -126,8 +140,40 @@ public:
     return transform;
   }
 
+  // std::optional<glm::mat4> getBoneTransform(const std::string &boneName,
+  //                                           float timeInTicks) {
+  //   // Find the animation channel for this bone
+  //   auto it = m_BoneInfo.find(boneName);
+  //   if (it == m_BoneInfo.end()) {
+  //     return std::nullopt; // No animation for this bone
+  //   }
+
+  //   aiNodeAnim *channel = it->second.channel;
+  //   if (!channel)
+  //     return std::nullopt;
+
+  //   // Interpolate position
+  //   glm::vec3 pos = AssimpGLMHelpers::LerpPosition(channel, timeInTicks);
+
+  //   // Interpolate rotation
+  //   glm::quat rot = AssimpGLMHelpers::SlerpRotation(channel, timeInTicks);
+
+  //   // Interpolate scale
+  //   glm::vec3 scale = AssimpGLMHelpers::LerpScale(channel, timeInTicks);
+
+  //   // Build transform matrix
+  //   glm::mat4 transform = glm::translate(glm::mat4(1.0f), pos);
+  //   transform *= glm::toMat4(rot);
+  //   transform = glm::scale(transform, scale);
+
+  //   return transform;
+  // }
+
   void CalculateBoneTransform(const AssimpNodeData *node,
                               glm::mat4 parentTransform) {
+    if (node == nullptr) {
+      return;
+    }
     std::string nodeName = node->name;
     glm::mat4 nodeTransform = node->transformation;
 
@@ -144,7 +190,9 @@ public:
     if (boneInfoMap.find(nodeName) != boneInfoMap.end()) {
       int index = boneInfoMap[nodeName].id;
       glm::mat4 offset = boneInfoMap[nodeName].offset;
-      m_FinalBoneMatrices[index] = globalTransformation * offset;
+      m_FinalBoneMatrices[index] =
+          m_CurrentAnimation->m_GlobalInverseTransform * globalTransformation *
+          offset;
     }
 
     for (int i = 0; i < node->childrenCount; i++)

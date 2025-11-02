@@ -4,6 +4,8 @@
 #include <assimp/scene.h>
 #include <functional>
 #include <glm/glm.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/string_cast.hpp>
 #include <learnopengl/animdata.h>
 #include <learnopengl/bone.h>
 // #include <learnopengl/model_animation.h>
@@ -29,6 +31,7 @@ public:
   int m_TicksPerSecond;
   std::string name;
   std::vector<MeshAnimationChannel> meshToChannel;
+  glm::mat4 m_GlobalInverseTransform;
   aiAnimation *animation;
   Animation() = default;
 
@@ -58,6 +61,21 @@ public:
     return nullptr;
   }
 
+  bool FindBoneOffsetInScene(const aiScene &scene, const std::string &boneName,
+                             aiMatrix4x4 &outOffset) {
+    for (unsigned int i = 0; i < scene.mNumMeshes; i++) {
+      aiMesh *mesh = scene.mMeshes[i];
+      for (unsigned int j = 0; j < mesh->mNumBones; j++) {
+        aiBone *bone = mesh->mBones[j];
+        if (bone->mName.data == boneName) {
+          outOffset = bone->mOffsetMatrix;
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   Animation(const aiScene &scene, aiAnimation *animation, std::string name) {
     this->animation = animation;
     this->name = name;
@@ -85,9 +103,48 @@ public:
       meshToChannel[meshIndex] = {node, channel, transform};
     }
 
+    for (unsigned int i = 0; i < animation->mNumChannels; i++) {
+      aiNodeAnim *channel = animation->mChannels[i];
+      std::string boneName = channel->mNodeName.data;
+
+      // Make sure the bone exists in the model’s bone info map
+      if (m_BoneInfoMap.find(boneName) == m_BoneInfoMap.end()) {
+        m_BoneInfoMap[boneName].id = m_BoneInfoMap.size();
+        aiMatrix4x4 offsetMatrix; // Assimp matrix
+
+        // You must call a function that finds the aiBone* for this boneName
+        // across all meshes in the scene and returns its mOffsetMatrix.
+        bool found = FindBoneOffsetInScene(scene, boneName, offsetMatrix);
+
+        if (found) {
+          m_BoneInfoMap[boneName].offset =
+              AssimpGLMHelpers::ConvertMatrixToGLMFormat(offsetMatrix);
+        } else {
+          // CRITICAL FALLBACK: If a channel exists but no bone data is found
+          // (e.g., node animation channel), use identity.
+          // If this is a real bone, setting to identity will cause the
+          // "scaled down" issue.
+          std::cerr << "Warning: Could not find offset for bone: " << boneName
+                    << ". Using identity matrix. Rigging issues likely."
+                    << std::endl;
+          m_BoneInfoMap[boneName].offset = glm::mat4(1.0f);
+        }
+      }
+
+      // Add a Bone object for this channel
+      Bone newBone(boneName, m_BoneInfoMap[boneName].id, channel);
+      std::cout << "Found boneName: " << boneName << std::endl;
+      m_Bones.push_back(newBone);
+    }
+
     aiMatrix4x4 globalTransformation = scene.mRootNode->mTransformation;
     globalTransformation = globalTransformation.Inverse();
-    // ReadHierarchyData(m_RootNode, scene.mRootNode);
+    m_GlobalInverseTransform =
+        AssimpGLMHelpers::ConvertMatrixToGLMFormat(globalTransformation);
+
+    std::cout << glm::to_string(m_GlobalInverseTransform) << std::endl;
+
+    ReadHierarchyData(m_RootNode, scene.mRootNode);
     // ReadMissingBones(animation, *model);
   }
 
@@ -135,20 +192,20 @@ private:
   //   m_BoneInfoMap = boneInfoMap;
   // }
 
-  // void ReadHierarchyData(AssimpNodeData &dest, const aiNode *src) {
-  //   assert(src);
+  void ReadHierarchyData(AssimpNodeData &dest, const aiNode *src) {
+    assert(src);
 
-  //   dest.name = src->mName.data;
-  //   dest.transformation =
-  //       AssimpGLMHelpers::ConvertMatrixToGLMFormat(src->mTransformation);
-  //   dest.childrenCount = src->mNumChildren;
+    dest.name = src->mName.data;
+    dest.transformation =
+        AssimpGLMHelpers::ConvertMatrixToGLMFormat(src->mTransformation);
+    dest.childrenCount = src->mNumChildren;
 
-  //   for (unsigned int i = 0; i < src->mNumChildren; i++) {
-  //     AssimpNodeData newData;
-  //     ReadHierarchyData(newData, src->mChildren[i]);
-  //     dest.children.push_back(newData);
-  //   }
-  // }
+    for (unsigned int i = 0; i < src->mNumChildren; i++) {
+      AssimpNodeData newData;
+      ReadHierarchyData(newData, src->mChildren[i]);
+      dest.children.push_back(newData);
+    }
+  }
   std::vector<Bone> m_Bones;
   AssimpNodeData m_RootNode;
   std::map<std::string, BoneInfo> m_BoneInfoMap;

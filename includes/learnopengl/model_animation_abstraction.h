@@ -145,7 +145,7 @@ public:
     modelMtx *= glm::toMat4(rotation);
     modelMtx = glm::scale(modelMtx, glm::vec3(scale));
 
-    float timeInTicks = animator.updateTime(deltaTime);
+    float timeInTicks = animator.updateTimeAndAnim(deltaTime);
     // if (weaponMesh == "hornet.008") {
     //   std::cout << "anim" << animator.GetAnimation() << std::endl;
     // }

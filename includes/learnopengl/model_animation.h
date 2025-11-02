@@ -85,7 +85,7 @@ public:
 
   Model(const aiScene *scene, const std::string &directory,
         std::string weaponMesh, bool gamma = false)
-      : gammaCorrection(gamma), directory(directory) {
+      : directory(directory), gammaCorrection(gamma) {
     if (!scene || !scene->mRootNode) {
       std::cerr << "ERROR::MODEL::INVALID_SCENE_POINTER\n";
       return;
@@ -139,41 +139,39 @@ public:
     return nullptr;
   }
 
-  // void
-  // BuildMeshAnimationCache(const aiScene *scene, const aiAnimation *animation,
-  //                         std::vector<MeshAnimationChannel> &meshAnimation) {
-  //   for (unsigned int meshIndex = 0; meshIndex < scene->mNumMeshes;
-  //        ++meshIndex) {
-  //     aiNode *node = FindNodeForMesh(scene->mRootNode, meshIndex);
-  //     if (!node)
-  //       continue;
-
-  //     aiNodeAnim *channel = nullptr;
-  //     for (unsigned int i = 0; i < animation->mNumChannels; i++) {
-  //       if (animation->mChannels[i]->mNodeName == node->mName) {
-  //         channel = animation->mChannels[i];
-  //         break;
-  //       }
-  //     }
-
-  //     glm::mat4 transform =
-  //         AssimpGLMHelpers::ConvertMatrixToGLMFormat(node->mTransformation);
-
-  //     meshAnimation[meshIndex] = {node, channel, transform};
-  //   }
-  // }
-
   // draws the model, and thus all its meshes
   void Draw(glm::mat4 objectModel, Shader &shader, Shader &hitboxShader,
             Animator &animator, float timeInTicks, bool showHitbox) {
+    std::vector<glm::mat4> finalBoneMatrices = animator.GetFinalBoneMatrices();
+
+    // Send to shader
+    for (unsigned int i = 0; i < finalBoneMatrices.size(); i++) {
+      shader.setMat4("finalBonesMatrices[" + std::to_string(i) + "]",
+                     finalBoneMatrices[i]);
+    }
+
+    bool hasBones = false;
     for (unsigned int i = 0; i < meshes.size(); i++) {
-      glm::mat4 transform = meshNodeTransforms[i];
-      std::optional<glm::mat4> animTrans =
-          animator.getMeshTransform(i, timeInTicks);
-      if (animTrans.has_value()) {
-        transform = *animTrans;
+      for (auto &vertex : meshes[i].vertices) {
+        for (int j = 0; j < MAX_BONE_INFLUENCE; j++) {
+          if (vertex.m_BoneIDs[j] >= 0) {
+            hasBones = true;
+            break;
+          }
+        }
+        if (hasBones)
+          break;
       }
-      glm::mat4 finalTransform = objectModel * transform;
+      glm::mat4 finalTransform = objectModel;
+      if (!hasBones) {
+        glm::mat4 transform = meshNodeTransforms[i];
+        std::optional<glm::mat4> animTrans =
+            animator.getMeshTransform(i, timeInTicks);
+        if (animTrans.has_value()) {
+          transform = *animTrans;
+        }
+        finalTransform *= transform;
+      }
       shader.setMat4("model", finalTransform);
 
       meshes[i].Draw(shader);
