@@ -67,7 +67,7 @@ public:
       const char *name = anim->mName.C_Str();
       std::cout << "Found action " << name << std::endl;
       this->nameToAnimation.insert(
-          {string(name), Animation(*scene, anim, name)});
+          {string(name), Animation(*scene, anim, name, model.get())});
     }
   }
 

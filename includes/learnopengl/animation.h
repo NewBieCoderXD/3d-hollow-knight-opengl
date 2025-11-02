@@ -68,7 +68,7 @@ public:
       aiMesh *mesh = scene.mMeshes[i];
       for (unsigned int j = 0; j < mesh->mNumBones; j++) {
         aiBone *bone = mesh->mBones[j];
-        if (bone->mName.data == boneName) {
+        if (bone->mName.C_Str() == boneName) {
           outOffset = bone->mOffsetMatrix;
           return true;
         }
@@ -77,7 +77,8 @@ public:
     return false;
   }
 
-  Animation(const aiScene &scene, aiAnimation *animation, std::string name) {
+  Animation(const aiScene &scene, aiAnimation *animation, std::string name,
+            Model *model) {
     this->animation = animation;
     this->name = name;
     m_Duration = animation->mDuration;
@@ -103,6 +104,9 @@ public:
 
       meshToChannel[meshIndex] = {node, channel, transform};
     }
+
+    ReadHierarchyData(m_RootNode, scene.mRootNode);
+    ReadMissingBones(animation, *model);
 
     for (unsigned int i = 0; i < animation->mNumChannels; i++) {
       aiNodeAnim *channel = animation->mChannels[i];
@@ -138,11 +142,6 @@ public:
     globalTransformation = globalTransformation.Inverse();
     m_GlobalInverseTransform =
         AssimpGLMHelpers::ConvertMatrixToGLMFormat(globalTransformation);
-
-    std::cout << glm::to_string(m_GlobalInverseTransform) << std::endl;
-
-    ReadHierarchyData(m_RootNode, scene.mRootNode);
-    // ReadMissingBones(animation, *model);
   }
 
   Bone *FindBone(const std::string &name) {

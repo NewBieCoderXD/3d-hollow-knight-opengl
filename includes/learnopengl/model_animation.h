@@ -16,6 +16,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <memory>
+#include <optional>
 #include <stb_image.h>
 
 #include <learnopengl/mesh.h>
@@ -36,7 +37,7 @@ using namespace std;
 class IAnimator {
 public:
   virtual ~IAnimator() = default;
-  virtual glm::mat4 GetGlobalNodeTransform(std::string) = 0;
+  virtual std::optional<glm::mat4> GetGlobalNodeTransform(std::string) = 0;
 };
 
 // struct MeshAnimationChannel {
@@ -165,9 +166,16 @@ public:
       //   if (hasBones)
       //     break;
       // }
-      glm::mat4 animatedNodeTransform =
-          animator.GetGlobalNodeTransform(mesh.name);
-      glm::mat4 finalTransform = objectModel * animatedNodeTransform;
+      glm::mat4 localTransform;
+      auto animatedNodeTransform = animator.GetGlobalNodeTransform(mesh.name);
+      if (!mesh.hasBones) {
+        if (!animatedNodeTransform.has_value()) {
+          localTransform = meshNodeTransforms[i];
+        } else {
+          localTransform = animatedNodeTransform.value();
+        }
+      }
+      glm::mat4 finalTransform = objectModel * localTransform;
       // if (!hasBones) {
       //   glm::mat4 transform = meshNodeTransforms[i];
       //   std::optional<glm::mat4> animTrans =
@@ -275,6 +283,10 @@ private:
     vector<unsigned int> indices;
     vector<Texture> textures;
 
+    std::cout << "Processing mesh: " << mesh->mName.C_Str()
+              << " hasBones: " << (mesh->HasBones() ? "true" : "false")
+              << std::endl;
+
     for (unsigned int i = 0; i < mesh->mNumVertices; i++) {
       Vertex vertex;
       SetVertexBoneDataToDefault(vertex);
@@ -342,7 +354,8 @@ private:
 
     ExtractBoneWeightForVertices(vertices, mesh, scene);
 
-    return Mesh(vertices, indices, textures, mesh->mName.C_Str(), mesh->mAABB);
+    return Mesh(vertices, indices, textures, mesh->mName.C_Str(), mesh->mAABB,
+                mesh->HasBones());
   }
 
   void SetVertexBoneData(Vertex &vertex, int boneID, float weight) {

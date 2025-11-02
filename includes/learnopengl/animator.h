@@ -197,12 +197,12 @@ public:
       CalculateBoneTransform(&node->children[i], globalTransformation);
   }
 
-  glm::mat4 GetGlobalNodeTransform(std::string nodeName) {
+  std::optional<glm::mat4> GetGlobalNodeTransform(std::string nodeName) {
     auto found = m_GlobalNodeTransforms.find(nodeName);
     if (found != m_GlobalNodeTransforms.end()) {
       return found->second;
     }
-    return glm::mat4(1.0f);
+    return {};
   }
 
   std::vector<glm::mat4> GetFinalBoneMatrices() { return m_FinalBoneMatrices; }

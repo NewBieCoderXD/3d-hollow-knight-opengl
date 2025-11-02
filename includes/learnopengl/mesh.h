@@ -64,13 +64,15 @@ public:
   vector<unsigned int> indices;
   vector<Texture> textures;
   unsigned int VAO;
+  bool hasBones;
   string name;
   Material material;
   AABB mAABB;
 
   // constructor
   Mesh(vector<Vertex> vertices, vector<unsigned int> indices,
-       vector<Texture> textures, string name, aiAABB mAiAABB) {
+       vector<Texture> textures, string name, aiAABB mAiAABB, bool hasBones)
+      : hasBones(hasBones) {
     this->vertices = vertices;
     this->indices = indices;
     this->textures = textures;
