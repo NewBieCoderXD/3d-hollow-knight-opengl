@@ -12,7 +12,7 @@
 
 enum class AnimationRunType { FORWARD, BACKWARD, FORWARD_AND_BACKWARD };
 
-class Animator {
+class Animator : public IAnimator {
 public:
   Animation *m_CurrentAnimation;
   float m_CurrentTime;
@@ -20,7 +20,7 @@ public:
   float m_DeltaTime;
   AnimationRunType type;
   bool clearAfterDone;
-  std::map<std::string, MeshAnimationChannel> m_BoneInfo;
+  std::map<std::string, glm::mat4> m_GlobalNodeTransforms;
 
   // void setAnimation(Animation *animation, bool reverse) {
   //   m_CurrentTime = 0.0;
@@ -79,23 +79,22 @@ public:
     this->duration = pAnimation->m_Duration;
     this->type = type;
     this->clearAfterDone = clearAfterDone;
-    m_BoneInfo.clear();
-    for (unsigned int i = 0; i < pAnimation->meshToChannel.size(); ++i) {
-      const MeshAnimationChannel &meshChannel = pAnimation->meshToChannel[i];
+    // m_BoneInfo.clear();
+    // for (unsigned int i = 0; i < pAnimation->meshToChannel.size(); ++i) {
+    //   const MeshAnimationChannel &meshChannel = pAnimation->meshToChannel[i];
 
-      if (meshChannel.channel) {
-        // Use the node name of the channel as key
-        std::string boneName = meshChannel.node->mName.C_Str();
-        m_BoneInfo[boneName] = meshChannel;
-      }
-    }
+    //   if (meshChannel.channel) {
+    //     // Use the node name of the channel as key
+    //     std::string boneName = meshChannel.node->mName.C_Str();
+    //     m_BoneInfo[boneName] = meshChannel;
+    //   }
+    // }
     if (type == AnimationRunType::FORWARD_AND_BACKWARD) {
       duration = 2.0f * pAnimation->m_Duration;
     }
   }
 
-  float updateTimeAndAnim(float deltaTime) {
-    float timeInTicks = deltaTime;
+  void updateAnim(float deltaTime) {
     if (m_CurrentAnimation != nullptr) {
       float ticksPerSecond = m_CurrentAnimation->m_TicksPerSecond != 0
                                  ? m_CurrentAnimation->m_TicksPerSecond
@@ -106,7 +105,6 @@ public:
       this->m_CurrentTime += deltaTime * ticksPerSecond;
 
       // Wrap around the animation duration
-      timeInTicks = this->getFrame();
       if (clearAfterDone && this->m_CurrentTime > this->duration) {
         this->m_CurrentAnimation = nullptr;
         std::cout << "time over" << std::endl;
@@ -116,7 +114,6 @@ public:
                                glm::mat4(1.0f));
       }
     }
-    return timeInTicks;
   }
 
   std::optional<glm::mat4> getMeshTransform(unsigned int meshIndex,
@@ -175,7 +172,7 @@ public:
       return;
     }
     std::string nodeName = node->name;
-    glm::mat4 nodeTransform = node->transformation;
+    glm::mat4 nodeTransform = node->localTransformation;
 
     Bone *Bone = m_CurrentAnimation->FindBone(nodeName);
 
@@ -186,17 +183,26 @@ public:
 
     glm::mat4 globalTransformation = parentTransform * nodeTransform;
 
+    m_GlobalNodeTransforms[nodeName] = globalTransformation;
+
     auto boneInfoMap = m_CurrentAnimation->GetBoneIDMap();
-    if (boneInfoMap.find(nodeName) != boneInfoMap.end()) {
-      int index = boneInfoMap[nodeName].id;
-      glm::mat4 offset = boneInfoMap[nodeName].offset;
-      m_FinalBoneMatrices[index] =
-          m_CurrentAnimation->m_GlobalInverseTransform * globalTransformation *
-          offset;
+    if (boneInfoMap.count(nodeName)) {
+      int boneID = boneInfoMap.at(nodeName).id;
+      glm::mat4 offsetMatrix = boneInfoMap.at(nodeName).offset;
+      // The final skinning matrix (to deform vertices in the shader)
+      m_FinalBoneMatrices[boneID] = globalTransformation * offsetMatrix;
     }
 
     for (int i = 0; i < node->childrenCount; i++)
       CalculateBoneTransform(&node->children[i], globalTransformation);
+  }
+
+  glm::mat4 GetGlobalNodeTransform(std::string nodeName) {
+    auto found = m_GlobalNodeTransforms.find(nodeName);
+    if (found != m_GlobalNodeTransforms.end()) {
+      return found->second;
+    }
+    return glm::mat4(1.0f);
   }
 
   std::vector<glm::mat4> GetFinalBoneMatrices() { return m_FinalBoneMatrices; }

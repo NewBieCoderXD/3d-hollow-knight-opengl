@@ -3,6 +3,7 @@
 #include "assimp/anim.h"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/ext/vector_float3.hpp"
+#include "glm/gtc/type_ptr.hpp"
 #include "learnopengl/animation.h"
 #include "learnopengl/animator.h"
 #include "learnopengl/bone.h"
@@ -145,12 +146,20 @@ public:
     modelMtx *= glm::toMat4(rotation);
     modelMtx = glm::scale(modelMtx, glm::vec3(scale));
 
-    float timeInTicks = animator.updateTimeAndAnim(deltaTime);
+    animator.updateAnim(deltaTime);
+    std::vector<glm::mat4> finalTransforms = animator.GetFinalBoneMatrices();
+    for (size_t i = 0; i < finalTransforms.size(); ++i) {
+      glUniformMatrix4fv(
+          glGetUniformLocation(
+              shader.ID,
+              ("finalBonesMatrices[" + std::to_string(i) + "]").c_str()),
+          1, GL_FALSE, glm::value_ptr(finalTransforms[i]));
+    }
+
     // if (weaponMesh == "hornet.008") {
     //   std::cout << "anim" << animator.GetAnimation() << std::endl;
     // }
-    model->Draw(modelMtx, shader, hitboxShader, animator, timeInTicks,
-                showHitbox);
+    model->Draw(modelMtx, animator, shader, hitboxShader, showHitbox);
     if (showHitbox) {
       glm::vec3 pos = glm::vec3(modelMtx[3]);
       hitbox->setVisible(true);

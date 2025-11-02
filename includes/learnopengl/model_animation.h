@@ -5,7 +5,6 @@
 #include "glm/ext/matrix_float4x4.hpp"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/fwd.hpp"
-#include "learnopengl/animator.h"
 #include "learnopengl/bone.h"
 #include "learnopengl/box.hpp"
 #include <assimp/anim.h>
@@ -34,6 +33,11 @@
 #include <vector>
 
 using namespace std;
+class IAnimator {
+public:
+  virtual ~IAnimator() = default;
+  virtual glm::mat4 GetGlobalNodeTransform(std::string) = 0;
+};
 
 // struct MeshAnimationChannel {
 //   aiNode *node;
@@ -139,42 +143,43 @@ public:
     return nullptr;
   }
 
+  glm::mat4 GetBoneOffsetMatrix(const std::string &name) const {
+    if (m_BoneInfoMap.count(name))
+      return m_BoneInfoMap.at(name).offset;
+    return glm::mat4(1.0f); // Identity if not found
+  }
+
   // draws the model, and thus all its meshes
-  void Draw(glm::mat4 objectModel, Shader &shader, Shader &hitboxShader,
-            Animator &animator, float timeInTicks, bool showHitbox) {
-    std::vector<glm::mat4> finalBoneMatrices = animator.GetFinalBoneMatrices();
-
-    // Send to shader
-    for (unsigned int i = 0; i < finalBoneMatrices.size(); i++) {
-      shader.setMat4("finalBonesMatrices[" + std::to_string(i) + "]",
-                     finalBoneMatrices[i]);
-    }
-
-    bool hasBones = false;
+  void Draw(glm::mat4 objectModel, IAnimator &animator, Shader &shader,
+            Shader &hitboxShader, bool showHitbox) {
+    // bool hasBones = false;
     for (unsigned int i = 0; i < meshes.size(); i++) {
-      for (auto &vertex : meshes[i].vertices) {
-        for (int j = 0; j < MAX_BONE_INFLUENCE; j++) {
-          if (vertex.m_BoneIDs[j] >= 0) {
-            hasBones = true;
-            break;
-          }
-        }
-        if (hasBones)
-          break;
-      }
-      glm::mat4 finalTransform = objectModel;
-      if (!hasBones) {
-        glm::mat4 transform = meshNodeTransforms[i];
-        std::optional<glm::mat4> animTrans =
-            animator.getMeshTransform(i, timeInTicks);
-        if (animTrans.has_value()) {
-          transform = *animTrans;
-        }
-        finalTransform *= transform;
-      }
+      Mesh mesh = meshes[i];
+      // for (auto &vertex : meshes[i].vertices) {
+      //   for (int j = 0; j < MAX_BONE_INFLUENCE; j++) {
+      //     if (vertex.m_BoneIDs[j] >= 0) {
+      //       hasBones = true;
+      //       break;
+      //     }
+      //   }
+      //   if (hasBones)
+      //     break;
+      // }
+      glm::mat4 animatedNodeTransform =
+          animator.GetGlobalNodeTransform(mesh.name);
+      glm::mat4 finalTransform = objectModel * animatedNodeTransform;
+      // if (!hasBones) {
+      //   glm::mat4 transform = meshNodeTransforms[i];
+      //   std::optional<glm::mat4> animTrans =
+      //       animator.getMeshTransform(i, timeInTicks);
+      //   if (animTrans.has_value()) {
+      //     transform = *animTrans;
+      //   }
+      //   finalTransform *= transform;
+      // }
       shader.setMat4("model", finalTransform);
 
-      meshes[i].Draw(shader);
+      mesh.Draw(shader);
 
       if (i == weaponMeshIndex && showHitbox && weaponHitbox != nullptr) {
         weaponPos = glm::vec3(finalTransform[3]);

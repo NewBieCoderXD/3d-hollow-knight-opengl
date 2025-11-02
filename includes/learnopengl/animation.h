@@ -1,5 +1,6 @@
 #pragma once
 
+#include "learnopengl/model_animation.h"
 #include <assimp/anim.h>
 #include <assimp/scene.h>
 #include <functional>
@@ -13,7 +14,7 @@
 #include <vector>
 
 struct AssimpNodeData {
-  glm::mat4 transformation;
+  glm::mat4 localTransformation;
   std::string name;
   int childrenCount;
   std::vector<AssimpNodeData> children;
@@ -120,10 +121,6 @@ public:
           m_BoneInfoMap[boneName].offset =
               AssimpGLMHelpers::ConvertMatrixToGLMFormat(offsetMatrix);
         } else {
-          // CRITICAL FALLBACK: If a channel exists but no bone data is found
-          // (e.g., node animation channel), use identity.
-          // If this is a real bone, setting to identity will cause the
-          // "scaled down" issue.
           std::cerr << "Warning: Could not find offset for bone: " << boneName
                     << ". Using identity matrix. Rigging issues likely."
                     << std::endl;
@@ -167,36 +164,35 @@ public:
   }
 
 private:
-  // void ReadMissingBones(const aiAnimation *animation, Model &model) {
-  //   int size = animation->mNumChannels;
+  void ReadMissingBones(const aiAnimation *animation, Model &model) {
+    int size = animation->mNumChannels;
 
-  //   auto &boneInfoMap = model.GetBoneInfoMap(); // getting m_BoneInfoMap from
-  //                                               // ModelAnimation class
-  //   int &boneCount = model.GetBoneCount(); // getting the m_BoneCounter from
-  //                                          // ModelAnimation class
+    auto &boneInfoMap = model.GetBoneInfoMap(); // getting m_BoneInfoMap from
+                                                // ModelAnimation class
+    int &boneCount = model.GetBoneCount(); // getting the m_BoneCounter from
+                                           // ModelAnimation class
 
-  //   // reading channels(bones engaged in an animation and their keyframes)
-  //   for (int i = 0; i < size; i++) {
-  //     auto channel = animation->mChannels[i];
-  //     std::string boneName = channel->mNodeName.data;
+    // reading channels(bones engaged in an animation and their keyframes)
+    for (int i = 0; i < size; i++) {
+      auto channel = animation->mChannels[i];
+      std::string boneName = channel->mNodeName.data;
 
-  //     if (boneInfoMap.find(boneName) == boneInfoMap.end()) {
-  //       boneInfoMap[boneName].id = boneCount;
-  //       boneCount++;
-  //     }
-  //     m_Bones.push_back(Bone(channel->mNodeName.data,
-  //                            boneInfoMap[channel->mNodeName.data].id,
-  //                            channel));
-  //   }
+      if (boneInfoMap.find(boneName) == boneInfoMap.end()) {
+        boneInfoMap[boneName].id = boneCount;
+        boneCount++;
+      }
+      m_Bones.push_back(Bone(channel->mNodeName.data,
+                             boneInfoMap[channel->mNodeName.data].id, channel));
+    }
 
-  //   m_BoneInfoMap = boneInfoMap;
-  // }
+    m_BoneInfoMap = boneInfoMap;
+  }
 
   void ReadHierarchyData(AssimpNodeData &dest, const aiNode *src) {
     assert(src);
 
     dest.name = src->mName.data;
-    dest.transformation =
+    dest.localTransformation =
         AssimpGLMHelpers::ConvertMatrixToGLMFormat(src->mTransformation);
     dest.childrenCount = src->mNumChildren;
 
