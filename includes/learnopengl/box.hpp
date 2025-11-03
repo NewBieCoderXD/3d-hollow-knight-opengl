@@ -17,9 +17,7 @@ public:
       return;
 
     // Set uniforms the box controls (only model + color)
-    GLint modelLoc = glGetUniformLocation(shaderProgram.ID, "model");
-    if (modelLoc != -1)
-      glUniformMatrix4fv(modelLoc, 1, GL_FALSE, &model[0][0]);
+    shaderProgram.setMat4("model", model);
 
     GLint colorLoc = glGetUniformLocation(shaderProgram.ID, "color");
     if (colorLoc != -1)

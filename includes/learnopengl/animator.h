@@ -177,7 +177,7 @@ public:
     Bone *Bone = m_CurrentAnimation->FindBone(nodeName);
 
     if (Bone) {
-      Bone->Update(m_CurrentTime);
+      Bone->Update(getFrame());
       nodeTransform = Bone->GetLocalTransform();
     }
 

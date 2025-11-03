@@ -30,7 +30,6 @@ public:
 
   float lastHit = 0.0f;
   std::unique_ptr<DebugBox> hitbox;
-  // std::unique_ptr<DebugBox> weaponHitbox;
   const bool showHitbox = true;
 
   Animator animator;

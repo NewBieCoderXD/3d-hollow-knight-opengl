@@ -159,17 +159,8 @@ public:
     // bool hasBones = false;
     for (unsigned int i = 0; i < meshes.size(); i++) {
       Mesh mesh = meshes[i];
-      // for (auto &vertex : meshes[i].vertices) {
-      //   for (int j = 0; j < MAX_BONE_INFLUENCE; j++) {
-      //     if (vertex.m_BoneIDs[j] >= 0) {
-      //       hasBones = true;
-      //       break;
-      //     }
-      //   }
-      //   if (hasBones)
-      //     break;
-      // }
-      glm::mat4 localTransform;
+
+      glm::mat4 localTransform = glm::mat4(1.0f);
       auto animatedNodeTransform = animator.GetGlobalNodeTransform(mesh.name);
       if (animatedNodeTransform.has_value()) {
         if (!mesh.hasBones) {
@@ -178,33 +169,25 @@ public:
       } else {
         localTransform = meshNodeTransforms[i];
       }
-      // if (!mesh.hasBones) {
-      //   if (!animatedNodeTransform.has_value()) {
-      //     localTransform = meshNodeTransforms[i];
-      //     if (name == "hornet") {
-      //       std::cout << glm::to_string(localTransform) << std::endl;
-      //     }
-      //   } else {
-      //     localTransform = animatedNodeTransform.value();
-      //   }
-      // }
       glm::mat4 finalTransform = objectModel * localTransform;
-      // if (!hasBones) {
-      //   glm::mat4 transform = meshNodeTransforms[i];
-      //   std::optional<glm::mat4> animTrans =
-      //       animator.getMeshTransform(i, timeInTicks);
-      //   if (animTrans.has_value()) {
-      //     transform = *animTrans;
-      //   }
-      //   finalTransform *= transform;
-      // }
 
       shader.setMat4("model", finalTransform);
 
       mesh.Draw(shader);
 
       if (i == weaponMeshIndex && showHitbox && weaponHitbox != nullptr) {
-        weaponPos = glm::vec3(finalTransform[3]);
+        hitboxShader.use();
+        hitboxShader.setMat4("projection", projection);
+        hitboxShader.setMat4("view", view);
+        auto boneTransform = animator.GetGlobalNodeTransform(weaponMesh);
+        glm::mat4 localTransform;
+        if (boneTransform.has_value()) {
+          localTransform = boneTransform.value();
+        } else {
+          localTransform = meshNodeTransforms[i];
+        }
+        glm::mat4 weaponGlobal = objectModel * localTransform;
+        weaponPos = glm::vec3(weaponGlobal[3]);
         weaponHitbox->setVisible(true);
         weaponHitbox->draw(glm::translate(glm::mat4(1.0f), weaponPos),
                            hitboxShader);
