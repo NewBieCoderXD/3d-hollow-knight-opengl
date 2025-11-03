@@ -20,7 +20,7 @@ public:
   float m_DeltaTime;
   AnimationRunType type;
   bool clearAfterDone;
-  std::map<std::string, glm::mat4> m_GlobalNodeTransforms;
+  std::unordered_map<std::string, glm::mat4> m_GlobalNodeTransforms;
 
   // void setAnimation(Animation *animation, bool reverse) {
   //   m_CurrentTime = 0.0;
@@ -72,13 +72,16 @@ public:
   //   }
   // }
 
-  void PlayAnimation(Animation *pAnimation, AnimationRunType type,
-                     bool clearAfterDone) {
+  void
+  PlayAnimation(Animation *pAnimation, AnimationRunType type,
+                std::unordered_map<std::string, glm::mat4> meshNodeTransforms,
+                bool clearAfterDone) {
     this->m_CurrentAnimation = pAnimation;
     this->m_CurrentTime = 0.0f;
     this->duration = pAnimation->m_Duration;
     this->type = type;
     this->clearAfterDone = clearAfterDone;
+    this->m_GlobalNodeTransforms = meshNodeTransforms;
     // m_BoneInfo.clear();
     // for (unsigned int i = 0; i < pAnimation->meshToChannel.size(); ++i) {
     //   const MeshAnimationChannel &meshChannel = pAnimation->meshToChannel[i];
@@ -177,7 +180,7 @@ public:
     Bone *Bone = m_CurrentAnimation->FindBone(nodeName);
 
     if (Bone) {
-      Bone->Update(getFrame());
+      Bone->Update(m_CurrentTime);
       nodeTransform = Bone->GetLocalTransform();
     }
 

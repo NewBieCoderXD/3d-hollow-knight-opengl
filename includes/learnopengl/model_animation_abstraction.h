@@ -26,7 +26,9 @@ public:
   float health = 5.0f;
   float maxHealth = 5.0f;
 
-  std::string weaponMeshName = "";
+  std::string weaponNodeName = "";
+  // glm::vec3 weaponSize = glm::vec3(0.0f);
+  // std::unique_ptr<DebugBox> weaponHitbox;
 
   float lastHit = 0.0f;
   std::unique_ptr<DebugBox> hitbox;
@@ -41,7 +43,7 @@ public:
                     glm::quat rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
                     glm::vec3 scale = glm::vec3(1.0f), bool gamma = false)
       : position(position), rotation(rotation), scale(scale), animator(NULL) {
-    this->weaponMeshName = weaponMesh;
+    this->weaponNodeName = weaponMesh;
 
     if (!showHitbox) {
       weaponMesh = "";
@@ -55,17 +57,37 @@ public:
     this->model = std::make_unique<Model>(
         Model(scene, path.substr(0, path.find_last_of('/')), scale, name,
               weaponMesh, false));
+    this->animator.m_GlobalNodeTransforms = this->model->meshNodeTransforms;
 
-    aiVector3D min(FLT_MAX, FLT_MAX, FLT_MAX);
-    aiVector3D max(-FLT_MAX, -FLT_MAX, -FLT_MAX);
-    ComputeBoundingBox(scene, scene->mRootNode, min, max, aiMatrix4x4());
-    glm::vec3 minGlm = AssimpGLMHelpers::GetGLMVec(min);
-    glm::vec3 maxGlm = AssimpGLMHelpers::GetGLMVec(max);
-    modelSize = (maxGlm - minGlm) * scale;
-    glm::vec3 halfSize = modelSize * 0.5f;
+    aiVector3D rootMin(FLT_MAX, FLT_MAX, FLT_MAX);
+    aiVector3D rootMax(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+    ComputeBoundingBox(scene, scene->mRootNode, rootMin, rootMax,
+                       aiMatrix4x4());
+    glm::vec3 rootMinGlm = AssimpGLMHelpers::GetGLMVec(rootMin);
+    glm::vec3 rootMaxGlm = AssimpGLMHelpers::GetGLMVec(rootMax);
+    modelSize = (rootMaxGlm - rootMinGlm) * scale;
+    glm::vec3 rootHalfSize = modelSize * 0.5f;
+
+    glm::vec3 weaponHalfSize = glm::vec3(0.0f);
+    glm::vec3 weaponSize = glm::vec3(0.0f);
+    aiNode *weaponNode = FindAiNodeByName(scene->mRootNode, weaponMesh);
+    if (weaponNode) {
+      aiVector3D weaponMin(FLT_MAX, FLT_MAX, FLT_MAX);
+      aiVector3D weaponMax(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+      ComputeBoundingBox(scene, FindAiNodeByName(scene->mRootNode, weaponMesh),
+                         rootMin, rootMax, aiMatrix4x4());
+      glm::vec3 weaponMinGlm = AssimpGLMHelpers::GetGLMVec(rootMin);
+      glm::vec3 weaponMaxGlm = AssimpGLMHelpers::GetGLMVec(rootMax);
+      glm::vec3 weaponSize = (weaponMaxGlm - weaponMinGlm) * scale;
+      weaponHalfSize = modelSize * 0.5f;
+    }
 
     if (showHitbox) {
-      hitbox = std::make_unique<DebugBox>(-halfSize, halfSize);
+      hitbox = std::make_unique<DebugBox>(-rootHalfSize, rootHalfSize);
+
+      this->model->weaponHitbox =
+          std::make_unique<DebugBox>(-weaponHalfSize, weaponHalfSize);
+      this->model->weaponSize = weaponSize;
     }
 
     for (unsigned int i = 0; i < scene->mNumAnimations; i++) {
@@ -88,6 +110,22 @@ public:
     }
 
     return meshToChannel;
+  }
+
+  aiNode *FindAiNodeByName(aiNode *node, const std::string &name) {
+    if (!node)
+      return nullptr;
+
+    if (node->mName.C_Str() == name) // Compare with aiString
+      return node;
+
+    for (unsigned int i = 0; i < node->mNumChildren; i++) {
+      aiNode *found = FindAiNodeByName(node->mChildren[i], name);
+      if (found)
+        return found;
+    }
+
+    return nullptr;
   }
 
   void ComputeBoundingBox(const aiScene *scene, const aiNode *node,
@@ -126,7 +164,9 @@ public:
     auto animationItr = this->nameToAnimation.find(name);
     if (animationItr != this->nameToAnimation.end()) {
       std::cout << "playing animation " << name << std::endl;
-      this->animator.PlayAnimation(&animationItr->second, type, clearAfterDone);
+      this->animator.PlayAnimation(&animationItr->second, type,
+                                   this->model->meshNodeTransforms,
+                                   clearAfterDone);
     } else {
       std::cout << "animation not found" << std::endl;
     }
@@ -180,6 +220,38 @@ public:
       pos.y = modelSize.y / 2.0;
       hitbox->setVisible(true);
       hitbox->draw(glm::translate(glm::mat4(1.0f), pos), hitboxShader);
+
+      if (showHitbox && this->model->weaponHitbox != nullptr &&
+          this->weaponNodeName != "") {
+        hitboxShader.use();
+        hitboxShader.setMat4("projection", projection);
+        hitboxShader.setMat4("view", view);
+
+        auto boneTransform =
+            animator.GetGlobalNodeTransform(this->weaponNodeName);
+        glm::mat4 localTransform = boneTransform.value();
+        // if (boneTransform.has_value()) {
+        //   localTransform = boneTransform.value();
+        // } else {
+        //   localTransform = this->model->meshNodeTransforms[i];
+        // }
+        glm::mat4 weaponGlobal = modelMtx * localTransform;
+        this->model->weaponPos = glm::vec3(weaponGlobal[3]);
+        // if (this->name == "hornet") {
+        //   // std::cout << animator.GetGlobalNodeTransforms().size() <<
+        //   // std::endl; for (auto pair : animator.GetGlobalNodeTransforms())
+        //   {
+        //   //   std::cout << pair << " " << std::endl;
+        //   // }
+        //   // std::cout << glm::to_string(localTransform)
+        //   //           << (boneTransform.has_value() ? "has bones" : "")
+        //   //           << std::endl;
+        // }
+        this->model->weaponHitbox->setVisible(true);
+        this->model->weaponHitbox->draw(
+            glm::translate(glm::mat4(1.0f), this->model->weaponPos),
+            hitboxShader);
+      }
     }
   }
 

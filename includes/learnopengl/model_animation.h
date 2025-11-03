@@ -67,7 +67,7 @@ static const std::vector<std::pair<aiTextureType, std::string>> textureTypes = {
 
 class Model {
 public:
-  std::vector<glm::mat4> meshNodeTransforms;
+  std::unordered_map<std::string, glm::mat4> meshNodeTransforms;
   // model data
   vector<Texture>
       textures_loaded; // stores all the textures loaded so far, optimization to
@@ -77,7 +77,7 @@ public:
 
   string directory;
   bool gammaCorrection;
-  string weaponMesh = "";
+  string weaponNode = "";
   glm::vec3 weaponSize = glm::vec3(0.0f);
   glm::vec3 weaponPos = glm::vec3(0.0f);
   std::unique_ptr<DebugBox> weaponHitbox;
@@ -98,7 +98,7 @@ public:
       return;
     };
 
-    this->weaponMesh = weaponMesh;
+    this->weaponNode = weaponMesh;
 
     processNode(scene->mRootNode, scene, scale);
     std::cout << "Number of meshes: " << meshes.size() << std::endl;
@@ -167,31 +167,13 @@ public:
           localTransform = animatedNodeTransform.value();
         }
       } else {
-        localTransform = meshNodeTransforms[i];
+        localTransform = meshNodeTransforms[mesh.nodeName];
       }
       glm::mat4 finalTransform = objectModel * localTransform;
 
       shader.setMat4("model", finalTransform);
 
       mesh.Draw(shader);
-
-      if (i == weaponMeshIndex && showHitbox && weaponHitbox != nullptr) {
-        hitboxShader.use();
-        hitboxShader.setMat4("projection", projection);
-        hitboxShader.setMat4("view", view);
-        auto boneTransform = animator.GetGlobalNodeTransform(weaponMesh);
-        glm::mat4 localTransform;
-        if (boneTransform.has_value()) {
-          localTransform = boneTransform.value();
-        } else {
-          localTransform = meshNodeTransforms[i];
-        }
-        glm::mat4 weaponGlobal = objectModel * localTransform;
-        weaponPos = glm::vec3(weaponGlobal[3]);
-        weaponHitbox->setVisible(true);
-        weaponHitbox->draw(glm::translate(glm::mat4(1.0f), weaponPos),
-                           hitboxShader);
-      }
     }
   }
 
@@ -242,27 +224,29 @@ private:
       aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
 
       // std::cout << "gg" << mesh->mName.C_Str() << weaponMesh << std::endl;
-      if (mesh->mName.C_Str() == weaponMesh) {
-        aiVector3D weaponMin(FLT_MAX, FLT_MAX, FLT_MAX);
-        aiVector3D weaponMax(-FLT_MAX, -FLT_MAX, -FLT_MAX);
-        computeMeshSize(mesh, nodeTransform, weaponMin, weaponMax);
 
-        glm::vec3 minGlm = AssimpGLMHelpers::GetGLMVec(weaponMin);
-        glm::vec3 maxGlm = AssimpGLMHelpers::GetGLMVec(weaponMax);
-        weaponSize = (maxGlm - minGlm) * scale;
-        glm::vec3 halfSize = weaponSize * 0.5f;
+      // Moved to ModelAnimationAbs
+      // if (mesh->mName.C_Str() == weaponNode) {
+      //   aiVector3D weaponMin(FLT_MAX, FLT_MAX, FLT_MAX);
+      //   aiVector3D weaponMax(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+      //   computeMeshSize(mesh, nodeTransform, weaponMin, weaponMax);
 
-        std::cout << "weapon: " << this->weaponMesh
-                  << " size: " << glm::to_string(weaponSize) << std::endl;
+      //   glm::vec3 minGlm = AssimpGLMHelpers::GetGLMVec(weaponMin);
+      //   glm::vec3 maxGlm = AssimpGLMHelpers::GetGLMVec(weaponMax);
+      //   weaponSize = (maxGlm - minGlm) * scale;
+      //   glm::vec3 halfSize = weaponSize * 0.5f;
 
-        weaponHitbox = std::make_unique<DebugBox>(-halfSize, halfSize);
+      //   std::cout << "weapon: " << this->weaponNode
+      //             << " size: " << glm::to_string(weaponSize) << std::endl;
 
-        weaponMeshIndex = meshes.size();
-      }
+      //   weaponHitbox = std::make_unique<DebugBox>(-halfSize, halfSize);
 
-      meshes.push_back(processMesh(mesh, scene));
-      meshNodeTransforms.push_back(nodeTransform);
+      //   weaponMeshIndex = meshes.size();
+      // }
+
+      meshes.push_back(processMesh(mesh, scene, node));
     }
+    meshNodeTransforms[node->mName.C_Str()] = nodeTransform;
     // after we've processed all of the meshes (if any) we then recursively
     // process each of the children nodes
     for (unsigned int i = 0; i < node->mNumChildren; i++) {
@@ -277,7 +261,7 @@ private:
     }
   }
 
-  Mesh processMesh(aiMesh *mesh, const aiScene *scene) {
+  Mesh processMesh(aiMesh *mesh, const aiScene *scene, aiNode *node) {
     vector<Vertex> vertices;
     vector<unsigned int> indices;
     vector<Texture> textures;
@@ -353,8 +337,8 @@ private:
 
     ExtractBoneWeightForVertices(vertices, mesh, scene);
 
-    return Mesh(vertices, indices, textures, mesh->mName.C_Str(), mesh->mAABB,
-                mesh->HasBones());
+    return Mesh(vertices, indices, textures, mesh->mName.C_Str(),
+                node->mName.C_Str(), mesh->mAABB, mesh->HasBones());
   }
 
   void SetVertexBoneData(Vertex &vertex, int boneID, float weight) {

@@ -64,6 +64,7 @@ public:
   vector<unsigned int> indices;
   vector<Texture> textures;
   unsigned int VAO;
+  std::string nodeName;
   bool hasBones;
   string name;
   Material material;
@@ -71,8 +72,9 @@ public:
 
   // constructor
   Mesh(vector<Vertex> vertices, vector<unsigned int> indices,
-       vector<Texture> textures, string name, aiAABB mAiAABB, bool hasBones)
-      : hasBones(hasBones) {
+       vector<Texture> textures, string name, string nodeName, aiAABB mAiAABB,
+       bool hasBones)
+      : nodeName(nodeName), hasBones(hasBones) {
     this->vertices = vertices;
     this->indices = indices;
     this->textures = textures;

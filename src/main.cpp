@@ -21,6 +21,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <iostream>
+#include <memory>
 #include <optional>
 
 #define MINIAUDIO_IMPLEMENTATION
@@ -38,7 +39,7 @@ unsigned int SCR_WIDTH = 800;
 unsigned int SCR_HEIGHT = 600;
 
 ma_engine audioEngine;
-std::vector<ma_sound> preLoadedSounds;
+std::unordered_map<std::string, std::unique_ptr<ma_sound>> preLoadedSounds;
 
 // camera
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
@@ -187,14 +188,13 @@ void updateKnightState() {
   }
 }
 
-ma_sound new_sound(std::string file, float volume) {
-  ma_sound sound;
+void new_sound(std::unique_ptr<ma_sound> &sound, std::string file,
+               float volume) {
+  ;
   auto ma_result = ma_sound_init_from_file(&audioEngine, file.c_str(), 0, NULL,
-                                           NULL, &sound);
+                                           NULL, sound.get());
   assert(ma_result == MA_SUCCESS);
-  ma_sound_set_volume(&sound, volume);
-  ma_sound_start(&sound);
-  return sound;
+  ma_sound_set_volume(sound.get(), volume);
 }
 
 int main() {
@@ -248,16 +248,14 @@ int main() {
 
   std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
-  ma_result result;
-
-  result = ma_engine_init(NULL, &audioEngine);
-  if (result != MA_SUCCESS) {
-    return -1;
-  }
+  ma_result result = ma_engine_init(NULL, &audioEngine);
+  assert(result == MA_SUCCESS);
 
   std::map<std::string, float> soundToVolume = {{AUDIO_SHAW, 0.2f}};
   for (auto [file, volume] : soundToVolume) {
-    preLoadedSounds.push_back(new_sound(file, volume));
+    std::unique_ptr<ma_sound> pSound = std::make_unique<ma_sound>();
+    new_sound(pSound, file, 0.2f);
+    preLoadedSounds[file] = std::move(pSound);
   }
 
   // build and compile shaders
@@ -293,7 +291,7 @@ int main() {
 
   Assimp::Importer hornetImporter;
   hornet.emplace(hornetImporter, "resources/hollow-knight-hornet/hornet.gltf",
-                 "hornet", "hornet.008", glm::vec3(0.0f),
+                 "hornet", "spear nail", glm::vec3(0.0f),
                  glm::quat(1.0, 0.0, 0.0, 0.0), glm::vec3(2.5f));
 
   Assimp::Importer stoneGroundImporter;
@@ -418,7 +416,9 @@ int main() {
 
   // glfw: terminate, clearing all previously allocated GLFW resources.
   // ------------------------------------------------------------------
-  ma_sound_uninit(preLoadedSounds.data());
+  for (auto &pair : preLoadedSounds) {
+    ma_sound_uninit(pair.second.get());
+  }
   ma_engine_uninit(&audioEngine);
   glfwTerminate();
   return 0;
