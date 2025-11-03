@@ -84,24 +84,24 @@ void randomHornetState() {
   if (hornetState == HornetState::DEAD) {
     return;
   }
-  if (glm::length(hornet->position - knight->position) < 6.0) {
-    // int action = (std::rand() % 3);
-    // hornetState = static_cast<HornetState>(action);
-    hornetState = HornetState::LUNGE_WAIT;
-    // switch (action) {
-    // case 0:
-    //   hornetState = HornetState::LUNGE_WAIT;
-    //   break;
-    // case 1:
-    //   hornetState = HornetState::LUNGE_WAIT;
-    //   break;
-    // case 2:
-    //   hornetState = HornetState::DASH_WAIT;
-    //   break;
-    // }
-  } else {
-    hornetState = HornetState::DASH_WAIT;
-  }
+  hornetState = HornetState::LUNGE_WAIT;
+  // if (glm::length(hornet->position - knight->position) < 6.0) {
+  //   // int action = (std::rand() % 3);
+  //   // hornetState = static_cast<HornetState>(action);
+  //   switch (action) {
+  //   case 0:
+  //     hornetState = HornetState::LUNGE_WAIT;
+  //     break;
+  //   case 1:
+  //     hornetState = HornetState::LUNGE_WAIT;
+  //     break;
+  //   case 2:
+  //     hornetState = HornetState::DASH_WAIT;
+  //     break;
+  //   }
+  // } else {
+  //   hornetState = HornetState::DASH_WAIT;
+  // }
   lastHornetAttack = lastFrame;
   // hornetState = HornetState::LUNGE_WAIT;
 
@@ -112,7 +112,7 @@ void randomHornetState() {
   switch (hornetState) {
   case HornetState::LUNGE_WAIT: {
     hornet->rotation = glm::quat_cast(rotationMatrix);
-    ma_engine_play_sound(&audioEngine, AUDIO_SHAW, NULL);
+    ma_sound_start(preLoadedSounds[AUDIO_SHAW].get());
     lastHornetStateSet = lastFrame;
     break;
   }
@@ -123,7 +123,7 @@ void randomHornetState() {
   }
   case HornetState::DASH_WAIT: {
     hornet->rotation = glm::quat_cast(rotationMatrix);
-    ma_engine_play_sound(&audioEngine, AUDIO_SHAW, NULL);
+    ma_sound_start(preLoadedSounds[AUDIO_SHAW].get());
     hornet->setAnimation("point_forward", AnimationRunType::FORWARD, false);
     lastHornetStateSet = lastFrame;
     break;
@@ -254,7 +254,7 @@ int main() {
   std::map<std::string, float> soundToVolume = {{AUDIO_SHAW, 0.2f}};
   for (auto [file, volume] : soundToVolume) {
     std::unique_ptr<ma_sound> pSound = std::make_unique<ma_sound>();
-    new_sound(pSound, file, 0.2f);
+    new_sound(pSound, file, volume);
     preLoadedSounds[file] = std::move(pSound);
   }
 

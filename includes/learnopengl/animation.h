@@ -5,6 +5,7 @@
 #include <assimp/scene.h>
 #include <functional>
 #include <glm/glm.hpp>
+#include <unordered_map>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/string_cast.hpp>
 #include <learnopengl/animdata.h>
@@ -32,6 +33,7 @@ public:
   int m_TicksPerSecond;
   std::string name;
   std::vector<MeshAnimationChannel> meshToChannel;
+  std::unordered_map<std::string, MeshAnimationChannel> meshNameToChannel;
   glm::mat4 m_GlobalInverseTransform;
   aiAnimation *animation;
   Animation() = default;
