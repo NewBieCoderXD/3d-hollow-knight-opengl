@@ -100,7 +100,7 @@ public:
     Yaw += xoffset;
     Pitch += yoffset;
 
-    Pitch = std::max(40.0f, std::min(75.0f, Pitch));
+    // Pitch = std::max(40.0f, std::min(75.0f, Pitch));
 
     // make sure that when pitch is out of bounds, screen doesn't get
     // flipped

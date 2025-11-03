@@ -254,7 +254,7 @@ int main() {
 
   Shader simple3dShader("src/simple3d.vert", "src/simple3d.frag");
 
-  Shader simple2dShader("src/simple2d.vert", "src/simple3d.frag");
+  // Shader simple2dShader("src/simple2d.vert", "src/simple3d.frag");
 
   Plane ground(1.0f);
   ground.position = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -267,18 +267,29 @@ int main() {
   stbi_set_flip_vertically_on_load(false);
 
   Assimp::Importer knightImporter;
+  // knight.emplace(knightImporter,
+  // "resources/hollow-knight-hornet/hornet2.glb",
+  //                "hornet.008", glm::vec3(5.0f), glm::quat(1.0, 0.0, 0.0,
+  //                0.0), glm::vec3(1.0f));
   knight.emplace(knightImporter, "resources/hollow-knight-the-knight.glb",
-                 "Knight_Nail");
+                 "knight", "Knight_Nail");
+  knight->position.x = 3.0;
 
   Assimp::Importer hornetImporter;
-  hornet.emplace(hornetImporter, "resources/hollow-knight-hornet/hornet1.gltf",
-                 "hornet.008");
-  hornet->position.x = 3.0f;
-  hornet->scale = 2.5f;
+  hornet.emplace(hornetImporter, "resources/hollow-knight-hornet/hornet.gltf",
+                 "hornet", "hornet.008", glm::vec3(0.0f),
+                 glm::quat(1.0, 0.0, 0.0, 0.0), glm::vec3(7.5f));
+  // hornet->scale = 2.5f;
+
+  // glm::vec3(0.0f, 0.0f, 3.0f),
+  // glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
+  // glm::angleAxis(glm::radians(180.0f), glm::vec3(0.0f, 1.0f,
+  // 0.0f)), glm::vec3(1.0f)
 
   Assimp::Importer stoneGroundImporter;
   ModelAnimationAbs stoneGround(stoneGroundImporter,
-                                "resources/stone_ground_01_a.glb", "");
+                                "resources/stone_ground_01_a.glb",
+                                "stoneGround", "");
   stoneGround.position.y = 4.0f;
 
   HealthBar playerHealth(200.0f, 20.0f, glm::vec2(10.0f, 10.0f),
@@ -305,10 +316,6 @@ int main() {
     // -----
     processInput(window);
 
-    // glfwSetCursorPos(window, SCR_WIDTH / 2.0f, SCR_HEIGHT / 2.0f);
-    // lastX = SCR_WIDTH / 2.0f;
-    // lastY = SCR_HEIGHT / 2.0f;
-
     // render
     // ------
     glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
@@ -320,30 +327,27 @@ int main() {
                          (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
     glm::mat4 view = camera.GetViewMatrix();
 
-    texturedModelWithBonesShader.use();
-    texturedModelWithBonesShader.setMat4("projection", projection);
-    texturedModelWithBonesShader.setMat4("view", view);
+    // texturedModelWithBonesShader.use();
 
-    texturedModelShader.use();
-    texturedModelShader.setMat4("projection", projection);
-    texturedModelShader.setMat4("view", view);
+    // texturedModelShader.use();
 
-    simple3dShader.use();
-    simple3dShader.setMat4("projection", projection);
-    simple3dShader.setMat4("view", view);
+    // simple3dShader.use();
+    // simple3dShader.setMat4("projection", projection);
+    // simple3dShader.setMat4("view", view);
+
     // ground.Draw(simple3dShader);
 
     // render the loaded model
     glm::mat4 model = glm::mat4(1.0f);
-    knight->draw(model, texturedModelWithBonesShader, simple3dShader, deltaTime,
-                 lastFrame);
+    knight->draw(model, projection, view, texturedModelWithBonesShader,
+                 simple3dShader, deltaTime, lastFrame);
 
     model = glm::mat4(1.0f);
-    hornet->draw(model, texturedModelWithBonesShader, simple3dShader, deltaTime,
-                 lastFrame);
+    hornet->draw(model, projection, view, texturedModelWithBonesShader,
+                 simple3dShader, deltaTime, lastFrame);
 
-    stoneGround.draw(model, texturedModelWithBonesShader, simple3dShader,
-                     deltaTime, lastFrame);
+    // stoneGround.draw(model, projection, view, texturedModelWithBonesShader,
+    //                  simple3dShader, deltaTime, lastFrame);
 
     if (hornetState == HornetState::IDLE &&
         lastFrame > lastHornetAttack + HORNET_ATTACK_COOLDOWN) {
@@ -352,48 +356,49 @@ int main() {
     updateHornetState();
     updateKnightState();
 
-    // Check if knight body hit hornet
-    if (lastFrame > DAMAGE_COOLDOWN + knight->lastHit &&
-        CheckAABBCollision(knight->position, knight->modelSize,
-                           hornet->position, hornet->modelSize / 2.0f)) {
-      knight->position +=
-          glm::normalize(knight->position - hornet->position) * 1.0f;
-      currentHealth -= 1;
-      playerHealth.setHealth(currentHealth, maxHealth);
-      knight->lastHit = lastFrame;
-    }
+    // // Check if knight body hit hornet
+    // if (lastFrame > DAMAGE_COOLDOWN + knight->lastHit &&
+    //     CheckAABBCollision(knight->position, knight->modelSize,
+    //                        hornet->position, hornet->modelSize / 2.0f)) {
+    //   knight->position +=
+    //       glm::normalize(knight->position - hornet->position) * 1.0f;
+    //   currentHealth -= 1;
+    //   playerHealth.setHealth(currentHealth, maxHealth);
+    //   knight->lastHit = lastFrame;
+    // }
 
-    // Check if knight's nail hit hornet
-    if (knightState == KnightState::ATTACKING &&
-        lastFrame > DAMAGE_COOLDOWN + hornet->lastHit &&
-        CheckAABBCollision(knight->getWeaponPosition(),
-                           knight->model->weaponSize * 2.0f, hornet->position,
-                           hornet->modelSize * 2.0f)) {
-      // std::cout << "HIT " << lastFrame << std::endl;
-      hornet->position +=
-          glm::normalize(hornet->position - knight->position) * 1.0f;
-      hornet->lastHit = lastFrame;
-      hornet->health -= 1;
-    }
+    // // Check if knight's nail hit hornet
+    // if (knightState == KnightState::ATTACKING &&
+    //     lastFrame > DAMAGE_COOLDOWN + hornet->lastHit &&
+    //     CheckAABBCollision(knight->getWeaponPosition(),
+    //                        knight->model->weaponSize * 2.0f,
+    //                        hornet->position, hornet->modelSize * 2.0f)) {
+    //   // std::cout << "HIT " << lastFrame << std::endl;
+    //   hornet->position +=
+    //       glm::normalize(hornet->position - knight->position) * 1.0f;
+    //   hornet->lastHit = lastFrame;
+    //   hornet->health -= 1;
+    // }
 
-    // Check if hornet's needle hit knight
-    if (lastFrame > DAMAGE_COOLDOWN + knight->lastHit &&
-        CheckAABBCollision(knight->position, knight->modelSize * 0.8f,
-                           hornet->getWeaponPosition(),
-                           hornet->model->weaponSize)) {
-      knight->position +=
-          glm::normalize(hornet->position - knight->position) * 1.0f;
-      currentHealth -= 1;
-      playerHealth.setHealth(currentHealth, maxHealth);
-      knight->lastHit = lastFrame;
-    }
+    // // Check if hornet's needle hit knight
+    // if (lastFrame > DAMAGE_COOLDOWN + knight->lastHit &&
+    //     CheckAABBCollision(knight->position, knight->modelSize * 0.8f,
+    //                        hornet->getWeaponPosition(),
+    //                        hornet->model->weaponSize)) {
+    //   knight->position +=
+    //       glm::normalize(hornet->position - knight->position) * 1.0f;
+    //   currentHealth -= 1;
+    //   playerHealth.setHealth(currentHealth, maxHealth);
+    //   knight->lastHit = lastFrame;
+    // }
 
-    glDisable(GL_DEPTH_TEST);
-    simple2dShader.use();
-    glm::mat4 uiProjection =
-        glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT);
-    playerHealth.draw(uiProjection, simple2dShader.ID);
-    glEnable(GL_DEPTH_TEST);
+    // glDisable(GL_DEPTH_TEST);
+    // simple2dShader.use();
+    // glm::mat4 uiProjection =
+    //     glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT);
+    // playerHealth.draw(uiProjection, simple2dShader.ID);
+    // glEnable(GL_DEPTH_TEST);
+
     // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved
     // etc.)
     // -------------------------------------------------------------------------------
@@ -439,6 +444,8 @@ void processInput(GLFWwindow *window) {
     glm::vec3 newPos = knight->position + moveDir * KNIGHT_SPEED * deltaTime;
     newPos.y = std::max(0.0f, newPos.y);
     knight->position = newPos;
+    glm::vec3 newCamPos = camera.Position + moveDir * KNIGHT_SPEED * deltaTime;
+    camera.Position = newCamPos;
 
     moveDir.y = 0.0f;
     // knight->rotation = glm::rotation(glm::vec3(0, 0, 1), moveDir);

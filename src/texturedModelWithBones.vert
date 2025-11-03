@@ -18,22 +18,22 @@ out vec2 TexCoords;
 	
 void main()
 {
-    vec4 totalPosition = vec4(0.0f);
-    vec3 totalNormal = vec3(0.0f);
-    
-    for(int i = 0 ; i < MAX_BONE_INFLUENCE ; i++)
-    {
-        // Basic check to see if this slot is even used
-        if(weights[i] == 0.0f)
-            continue;
-        
-        // Safety checks (optional, but good practice)
-        if(boneIds[i] < 0 || boneIds[i] >= MAX_BONES) 
-            continue;
-            
-        mat4 boneTransform = finalBonesMatrices[boneIds[i]];
-        float weight = weights[i];
-
+     vec4 totalPosition = vec4(0.0f);
+     vec3 totalNormal = vec3(0.0f);
+     
+     for(int i = 0 ; i < MAX_BONE_INFLUENCE ; i++)
+     {
+         // Basic check to see if this slot is even used
+         if(weights[i] == 0.0f)
+             continue;
+         
+         // Safety checks (optional, but good practice)
+         if(boneIds[i] < 0 || boneIds[i] >= MAX_BONES) 
+             continue;
+             
+         mat4 boneTransform = finalBonesMatrices[boneIds[i]];
+         float weight = weights[i];
+         
         // Accumulate Position: Final_Transform * (Vertex_Position * Weight)
         // Note: The matrix multiplication with the position already includes the weight
         totalPosition += (boneTransform * vec4(pos, 1.0f)) * weight;
@@ -50,12 +50,13 @@ void main()
         totalPosition = vec4(pos, 1.0f); 
         totalNormal = norm;
     }
-  
-    mat4 viewModel = view * model;
-    gl_Position =  projection * viewModel * totalPosition;
-    TexCoords = tex;
-    //  vec4 totalPosition = vec4(pos,1.0f);
-    //  mat4 viewModel = view * model;
-    //  gl_Position =  projection * viewModel * totalPosition;
-    //  TexCoords = tex;
+    
+     mat4 viewModel = view * model;
+     gl_Position =  projection * viewModel * totalPosition;
+     TexCoords = tex;
+
+    //vec4 totalPosition = vec4(pos,1.0f);
+    //mat4 viewModel = view * model;
+    //gl_Position =  projection * viewModel * totalPosition;
+    //TexCoords = tex;
 }

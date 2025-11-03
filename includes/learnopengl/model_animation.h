@@ -73,6 +73,8 @@ public:
       textures_loaded; // stores all the textures loaded so far, optimization to
                        // make sure textures aren't loaded more than once.
   vector<Mesh> meshes;
+  std::string name = "";
+
   string directory;
   bool gammaCorrection;
   string weaponMesh = "";
@@ -88,9 +90,9 @@ public:
     loadModel(path);
   }
 
-  Model(const aiScene *scene, const std::string &directory,
-        std::string weaponMesh, bool gamma = false)
-      : directory(directory), gammaCorrection(gamma) {
+  Model(const aiScene *scene, const std::string &directory, glm::vec3 scale,
+        std::string name, std::string weaponMesh, bool gamma = false)
+      : name(name), directory(directory), gammaCorrection(gamma) {
     if (!scene || !scene->mRootNode) {
       std::cerr << "ERROR::MODEL::INVALID_SCENE_POINTER\n";
       return;
@@ -98,7 +100,7 @@ public:
 
     this->weaponMesh = weaponMesh;
 
-    processNode(scene->mRootNode, scene);
+    processNode(scene->mRootNode, scene, scale);
     std::cout << "Number of meshes: " << meshes.size() << std::endl;
 
     // for (unsigned int i = 0; i < scene->mNumAnimations; i++) {
@@ -151,8 +153,9 @@ public:
   }
 
   // draws the model, and thus all its meshes
-  void Draw(glm::mat4 objectModel, IAnimator &animator, Shader &shader,
-            Shader &hitboxShader, bool showHitbox) {
+  void Draw(glm::mat4 objectModel, glm::mat4 projection, glm::mat4 view,
+            IAnimator &animator, Shader &shader, Shader &hitboxShader,
+            bool showHitbox) {
     // bool hasBones = false;
     for (unsigned int i = 0; i < meshes.size(); i++) {
       Mesh mesh = meshes[i];
@@ -168,13 +171,23 @@ public:
       // }
       glm::mat4 localTransform;
       auto animatedNodeTransform = animator.GetGlobalNodeTransform(mesh.name);
-      if (!mesh.hasBones) {
-        if (!animatedNodeTransform.has_value()) {
-          localTransform = meshNodeTransforms[i];
-        } else {
+      if (animatedNodeTransform.has_value()) {
+        if (!mesh.hasBones) {
           localTransform = animatedNodeTransform.value();
         }
+      } else {
+        localTransform = meshNodeTransforms[i];
       }
+      // if (!mesh.hasBones) {
+      //   if (!animatedNodeTransform.has_value()) {
+      //     localTransform = meshNodeTransforms[i];
+      //     if (name == "hornet") {
+      //       std::cout << glm::to_string(localTransform) << std::endl;
+      //     }
+      //   } else {
+      //     localTransform = animatedNodeTransform.value();
+      //   }
+      // }
       glm::mat4 finalTransform = objectModel * localTransform;
       // if (!hasBones) {
       //   glm::mat4 transform = meshNodeTransforms[i];
@@ -185,6 +198,7 @@ public:
       //   }
       //   finalTransform *= transform;
       // }
+
       shader.setMat4("model", finalTransform);
 
       mesh.Draw(shader);
@@ -231,10 +245,12 @@ private:
   // located at the node and repeats this process on its children nodes (if
   // any).
   void processNode(aiNode *node, const aiScene *scene,
+                   glm::vec3 scale = glm::vec3(1.0f),
                    const glm::mat4 &parentTransform = glm::mat4(1.0f)) {
     glm::mat4 nodeTransform =
         parentTransform *
         AssimpGLMHelpers::ConvertMatrixToGLMFormat(node->mTransformation);
+
     // process each mesh located at the current node
     for (unsigned int i = 0; i < node->mNumMeshes; i++) {
       // the node object only contains indices to index the actual objects in
@@ -247,16 +263,16 @@ private:
         aiVector3D weaponMin(FLT_MAX, FLT_MAX, FLT_MAX);
         aiVector3D weaponMax(-FLT_MAX, -FLT_MAX, -FLT_MAX);
         computeMeshSize(mesh, nodeTransform, weaponMin, weaponMax);
-        weaponSize =
-            glm::vec3(weaponMax.x - weaponMin.x, weaponMax.y - weaponMin.y,
-                      weaponMax.z - weaponMin.z);
+
+        glm::vec3 minGlm = AssimpGLMHelpers::GetGLMVec(weaponMin);
+        glm::vec3 maxGlm = AssimpGLMHelpers::GetGLMVec(weaponMax);
+        weaponSize = (maxGlm - minGlm) * scale;
+        glm::vec3 halfSize = weaponSize * 0.5f;
 
         std::cout << "weapon: " << this->weaponMesh
                   << " size: " << glm::to_string(weaponSize) << std::endl;
 
-        weaponHitbox = std::make_unique<DebugBox>(
-            glm::vec3(weaponMin.x, weaponMin.y, weaponMin.z),
-            glm::vec3(weaponMax.x, weaponMax.y, weaponMax.z));
+        weaponHitbox = std::make_unique<DebugBox>(-halfSize, halfSize);
 
         weaponMeshIndex = meshes.size();
       }
@@ -267,7 +283,7 @@ private:
     // after we've processed all of the meshes (if any) we then recursively
     // process each of the children nodes
     for (unsigned int i = 0; i < node->mNumChildren; i++) {
-      processNode(node->mChildren[i], scene, nodeTransform);
+      processNode(node->mChildren[i], scene, scale, nodeTransform);
     }
   }
 
@@ -283,7 +299,7 @@ private:
     vector<unsigned int> indices;
     vector<Texture> textures;
 
-    std::cout << "Processing mesh: " << mesh->mName.C_Str()
+    std::cout << "  Processing mesh: " << mesh->mName.C_Str()
               << " hasBones: " << (mesh->HasBones() ? "true" : "false")
               << std::endl;
 
@@ -373,6 +389,18 @@ private:
     auto &boneInfoMap = m_BoneInfoMap;
     int &boneCount = m_BoneCounter;
 
+    // std::cout << "Processing mesh: " << mesh->mName.C_Str()
+    //           << " hasBones: " << mesh->HasBones()
+    //           << " numBones: " << mesh->mNumBones << std::endl;
+
+    // for (unsigned int b = 0; b < mesh->mNumBones; ++b) {
+    //   std::cout << "Bone: " << mesh->mBones[b]->mName.C_Str()
+    //             << " offset matrix: "
+    //             << glm::to_string(AssimpGLMHelpers::ConvertMatrixToGLMFormat(
+    //                    mesh->mBones[b]->mOffsetMatrix))
+    //             << std::endl;
+    // }
+
     for (unsigned int boneIndex = 0; boneIndex < mesh->mNumBones; ++boneIndex) {
       int boneID = -1;
       std::string boneName = mesh->mBones[boneIndex]->mName.C_Str();
@@ -448,7 +476,7 @@ private:
     for (unsigned int i = 0; i < mat->GetTextureCount(type); i++) {
       aiString str;
       if (mat->GetTexture(type, i, &str) == AI_SUCCESS) {
-        std::cout << "Found texture: " << str.C_Str() << std::endl;
+        std::cout << "  Found texture: " << str.C_Str() << std::endl;
         if (str.C_Str()[0] == '*') {
           // embedded texture
           int texIndex = atoi(str.C_Str() + 1);

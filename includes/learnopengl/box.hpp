@@ -16,8 +16,6 @@ public:
     if (!visible)
       return;
 
-    shaderProgram.use();
-
     // Set uniforms the box controls (only model + color)
     GLint modelLoc = glGetUniformLocation(shaderProgram.ID, "model");
     if (modelLoc != -1)
