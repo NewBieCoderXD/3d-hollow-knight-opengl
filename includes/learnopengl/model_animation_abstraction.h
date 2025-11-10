@@ -22,6 +22,10 @@ public:
   glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
   glm::vec3 scale = glm::vec3(1.0f);
 
+  glm::vec3 velocity{0.0f, 0.0f, 0.0f};
+  glm::vec3 acceleration{0.0f, 0.0f, 0.0f};
+  float friction = 8.0f;
+
   glm::vec3 modelSize = glm::vec3(0.0f);
   float health = 5.0f;
   float maxHealth = 5.0f;
@@ -78,7 +82,7 @@ public:
                          rootMin, rootMax, aiMatrix4x4());
       glm::vec3 weaponMinGlm = AssimpGLMHelpers::GetGLMVec(rootMin);
       glm::vec3 weaponMaxGlm = AssimpGLMHelpers::GetGLMVec(rootMax);
-      glm::vec3 weaponSize = (weaponMaxGlm - weaponMinGlm) * scale;
+      weaponSize = (weaponMaxGlm - weaponMinGlm) * scale;
       weaponHalfSize = modelSize * 0.5f;
     }
 
@@ -169,6 +173,18 @@ public:
                                    clearAfterDone);
     } else {
       std::cout << "animation not found" << std::endl;
+    }
+  }
+
+  void updatePosition(float deltaTime) {
+    if (glm::length(this->velocity) > 0.01) {
+      this->position += this->velocity * deltaTime;
+      this->position.y = 0;
+    }
+    this->velocity += this->acceleration * deltaTime;
+    this->velocity *= (1 - this->friction * deltaTime);
+    if (this->model->name == "hornet") {
+      std::cout << glm::to_string(this->velocity) << std::endl;
     }
   }
 

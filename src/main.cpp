@@ -84,26 +84,25 @@ void randomHornetState() {
   if (hornetState == HornetState::DEAD) {
     return;
   }
-  hornetState = HornetState::LUNGE_WAIT;
-  // if (glm::length(hornet->position - knight->position) < 6.0) {
-  //   // int action = (std::rand() % 3);
-  //   // hornetState = static_cast<HornetState>(action);
-  //   switch (action) {
-  //   case 0:
-  //     hornetState = HornetState::LUNGE_WAIT;
-  //     break;
-  //   case 1:
-  //     hornetState = HornetState::LUNGE_WAIT;
-  //     break;
-  //   case 2:
-  //     hornetState = HornetState::DASH_WAIT;
-  //     break;
-  //   }
-  // } else {
-  //   hornetState = HornetState::DASH_WAIT;
-  // }
-  lastHornetAttack = lastFrame;
   // hornetState = HornetState::LUNGE_WAIT;
+  if (glm::length(hornet->position - knight->position) < 6.0) {
+    int action = (std::rand() % 3);
+    // hornetState = static_cast<HornetState>(action);
+    switch (action) {
+    case 0:
+      hornetState = HornetState::LUNGE_WAIT;
+      break;
+    case 1:
+      hornetState = HornetState::LUNGE_WAIT;
+      break;
+    case 2:
+      hornetState = HornetState::DASH_WAIT;
+      break;
+    }
+  } else {
+    hornetState = HornetState::DASH_WAIT;
+  }
+  lastHornetAttack = lastFrame;
 
   glm::mat4 lookAtMatrix = glm::lookAt(hornet->position, knight->position,
                                        glm::vec3(0.0f, 1.0f, 0.0f));
@@ -162,7 +161,7 @@ void updateHornetState() {
     break;
   }
   case HornetState::DASH: {
-    hornet->position -= hornet->getFront() * HORNET_DASH_SPEED * deltaTime;
+    hornet->velocity -= hornet->getFront() * HORNET_DASH_SPEED;
     if (lastFrame > lastHornetStateSet + 0.6f) {
       hornetState = HornetState::IDLE;
       lastHornetStateSet = lastFrame;
@@ -268,7 +267,7 @@ int main() {
 
   Shader simple3dShader("src/simple3d.vert", "src/simple3d.frag");
 
-  // Shader simple2dShader("src/simple2d.vert", "src/simple3d.frag");
+  Shader simple2dShader("src/simple2d.vert", "src/simple3d.frag");
 
   Plane ground(1.0f);
   ground.position = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -298,7 +297,7 @@ int main() {
   ModelAnimationAbs stoneGround(stoneGroundImporter,
                                 "resources/stone_ground_01_a.glb",
                                 "stoneGround", "");
-  stoneGround.position.y = 4.0f;
+  // stoneGround.position.y = 4.0f;
 
   HealthBar playerHealth(200.0f, 20.0f, glm::vec2(10.0f, 10.0f),
                          glm::vec3(1.0f, 0.0f, 0.0f));
@@ -329,6 +328,11 @@ int main() {
     glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+    knight->updatePosition(deltaTime);
+
+    camera.LookAt = knight->position;
+    camera.UpdateCameraVectors();
+
     // view/projection transformations
     glm::mat4 projection =
         glm::perspective(glm::radians(camera.Zoom),
@@ -347,10 +351,12 @@ int main() {
 
     // render the loaded model
     glm::mat4 model = glm::mat4(1.0f);
+    // Knight position is already updated above
     knight->draw(model, projection, view, texturedModelWithBonesShader,
                  simple3dShader, deltaTime, lastFrame);
 
     model = glm::mat4(1.0f);
+    hornet->updatePosition(deltaTime);
     hornet->draw(model, projection, view, texturedModelWithBonesShader,
                  simple3dShader, deltaTime, lastFrame);
 
@@ -368,8 +374,10 @@ int main() {
     if (lastFrame > DAMAGE_COOLDOWN + knight->lastHit &&
         CheckAABBCollision(knight->position, knight->modelSize,
                            hornet->position, hornet->modelSize)) {
-      knight->position +=
-          glm::normalize(knight->position - hornet->position) * 1.0f;
+      // knight->position +=
+      //     glm::normalize(knight->position - hornet->position) * 1.0f;
+      knight->velocity +=
+          glm::normalize(knight->position - hornet->position) * KNOCKBACK_SPEED;
       currentHealth -= 1;
       playerHealth.setHealth(currentHealth, maxHealth);
       knight->lastHit = lastFrame;
@@ -382,8 +390,11 @@ int main() {
                            knight->model->weaponSize, hornet->position,
                            hornet->modelSize)) {
       // std::cout << "HIT " << lastFrame << std::endl;
-      hornet->position +=
-          glm::normalize(hornet->position - knight->position) * 1.0f;
+      // hornet->position +=
+      //     glm::normalize(hornet->position - knight->position) * 1.0f;
+      hornet->velocity +=
+          glm::normalize(hornet->position - knight->position) * KNOCKBACK_SPEED;
+
       hornet->lastHit = lastFrame;
       hornet->health -= 1;
     }
@@ -393,19 +404,21 @@ int main() {
         CheckAABBCollision(knight->position, knight->modelSize,
                            hornet->getWeaponPosition(),
                            hornet->model->weaponSize)) {
-      knight->position +=
-          glm::normalize(hornet->position - knight->position) * 1.0f;
+      // knight->position +=
+      //     glm::normalize(hornet->position - knight->position) * 1.0f;
+      knight->velocity +=
+          glm::normalize(knight->position - hornet->position) * KNOCKBACK_SPEED;
       currentHealth -= 1;
       playerHealth.setHealth(currentHealth, maxHealth);
       knight->lastHit = lastFrame;
     }
 
-    // glDisable(GL_DEPTH_TEST);
-    // simple2dShader.use();
-    // glm::mat4 uiProjection =
-    //     glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT);
-    // playerHealth.draw(uiProjection, simple2dShader.ID);
-    // glEnable(GL_DEPTH_TEST);
+    glDisable(GL_DEPTH_TEST);
+    simple2dShader.use();
+    glm::mat4 uiProjection =
+        glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT);
+    playerHealth.draw(uiProjection, simple2dShader.ID);
+    glEnable(GL_DEPTH_TEST);
 
     // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved
     // etc.)
@@ -452,13 +465,14 @@ void processInput(GLFWwindow *window) {
 
   if (glm::length(moveDir) > 0.001f) {
     moveDir = glm::normalize(moveDir);
-    glm::vec3 newPos = knight->position + moveDir * KNIGHT_SPEED * deltaTime;
-    newPos.y = std::max(0.0f, newPos.y);
-    knight->position = newPos;
-    glm::vec3 newCamPos = camera.Position + moveDir * KNIGHT_SPEED * deltaTime;
-    camera.Position = newCamPos;
+    knight->velocity += moveDir * KNIGHT_SPEED;
+    // glm::vec3 newPos = knight->position + moveDir * KNIGHT_SPEED * deltaTime;
+    // newPos.y = std::max(0.0f, newPos.y);
+    // knight->position = newPos;
+    // glm::vec3 newCamPos = camera.Position + moveDir * KNIGHT_SPEED *
+    // deltaTime; camera.Position = newCamPos;
 
-    moveDir.y = 0.0f;
+    // moveDir.y = 0.0f;
     // knight->rotation = glm::rotation(glm::vec3(0, 0, 1), moveDir);
 
     camera.KnightFront = moveDir;

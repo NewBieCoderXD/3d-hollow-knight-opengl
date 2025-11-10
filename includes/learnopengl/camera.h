@@ -44,6 +44,23 @@ public:
   // glm::vec3 cameraOffset{-1.0f, 0.0f, 6.0f};
   float distance = 15.0;
 
+  // calculates the front vector from the Camera's (updated) Euler Angles
+  void UpdateCameraVectors() {
+    float radYaw = glm::radians(Yaw);
+    float radPitch = glm::radians(Pitch);
+
+    float x = distance * cos(radPitch) * cos(radYaw);
+    float y = distance * sin(radPitch);
+    float z = distance * cos(radPitch) * sin(radYaw);
+
+    glm::vec3 offset = glm::vec3(x, y, z);
+
+    Position = LookAt + offset;
+    Front = glm::normalize(LookAt - Position);
+    Right = glm::normalize(glm::cross(Front, WorldUp));
+    Up = glm::normalize(glm::cross(Right, Front));
+  }
+
   // constructor with vectors
   Camera(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f),
          glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f), float yaw = YAW,
@@ -55,7 +72,7 @@ public:
     Yaw = yaw;
     Pitch = pitch;
     KnightFront = glm::vec3(0.0f, 0.0f, 1.0f); // initial knight facing +Z
-    updateCameraVectors();
+    UpdateCameraVectors();
   }
   // constructor with scalar values
   Camera(float posX, float posY, float posZ, float upX, float upY, float upZ,
@@ -67,7 +84,7 @@ public:
     Yaw = yaw;
     Pitch = pitch;
     KnightFront = glm::vec3(0.0f, 0.0f, 1.0f); // initial knight facing +Z
-    updateCameraVectors();
+    UpdateCameraVectors();
   }
 
   // returns the view matrix calculated using Euler Angles and the LookAt Matrix
@@ -104,15 +121,15 @@ public:
 
     // make sure that when pitch is out of bounds, screen doesn't get
     // flipped
-    // if (constrainPitch) {
-    //   if (Pitch > 89.0f)
-    //     Pitch = 89.0f;
-    //   if (Pitch < -89.0f)
-    //     Pitch = -89.0f;
-    // }
+    if (constrainPitch) {
+      if (Pitch > 89.0f)
+        Pitch = 89.0f;
+      if (Pitch < -89.0f)
+        Pitch = -89.0f;
+    }
 
     // update Front, Right and Up Vectors using the updated Euler angles
-    updateCameraVectors();
+    UpdateCameraVectors();
   }
 
   // processes input received from a mouse scroll-wheel event. Only requires
@@ -123,24 +140,6 @@ public:
       Zoom = 1.0f;
     if (Zoom > 45.0f)
       Zoom = 45.0f;
-  }
-
-private:
-  // calculates the front vector from the Camera's (updated) Euler Angles
-  void updateCameraVectors() {
-    float radYaw = glm::radians(Yaw);
-    float radPitch = glm::radians(Pitch);
-
-    float x = distance * cos(radPitch) * cos(radYaw);
-    float y = distance * sin(radPitch);
-    float z = distance * cos(radPitch) * sin(radYaw);
-
-    glm::vec3 offset = glm::vec3(x, y, z);
-
-    Position = LookAt + offset;
-    Front = glm::normalize(LookAt - Position);
-    Right = glm::normalize(glm::cross(Front, WorldUp));
-    Up = glm::normalize(glm::cross(Right, Front));
   }
 };
 #endif
