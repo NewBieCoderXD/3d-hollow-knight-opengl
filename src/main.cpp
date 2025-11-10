@@ -101,22 +101,22 @@ void randomHornetState() {
     return;
   }
 
-  // hornetState = HornetState::JUMP_WAIT;
+  hornetState = HornetState::LUNGE_WAIT;
 
-  if (glm::length(hornet->position - knight->position) < 6.0) {
-    float action = toTenDist(randomEngine);
-    // int action = (std::rand() % 3);
-    // hornetState = static_cast<HornetState>(action);
-    if (action < 3.0) {
-      hornetState = HornetState::LUNGE_WAIT;
-    } else if (action < 9.0) {
-      hornetState = HornetState::JUMP_WAIT;
-    } else {
-      hornetState = HornetState::DASH_WAIT;
-    }
-  } else {
-    hornetState = HornetState::DASH_WAIT;
-  }
+  // if (glm::length(hornet->position - knight->position) < 6.0) {
+  //   float action = toTenDist(randomEngine);
+  //   // int action = (std::rand() % 3);
+  //   // hornetState = static_cast<HornetState>(action);
+  //   if (action < 3.0) {
+  //     hornetState = HornetState::LUNGE_WAIT;
+  //   } else if (action < 9.0) {
+  //     hornetState = HornetState::JUMP_WAIT;
+  //   } else {
+  //     hornetState = HornetState::DASH_WAIT;
+  //   }
+  // } else {
+  //   hornetState = HornetState::DASH_WAIT;
+  // }
   lastHornetAttack = lastFrame;
 
   glm::mat4 lookAtMatrix = glm::lookAt(hornet->position, knight->position,
@@ -356,7 +356,7 @@ int main() {
   knight->position.x = 3.0;
 
   Assimp::Importer hornetImporter;
-  hornet.emplace(hornetImporter, "resources/hollow-knight-hornet/hornet.gltf",
+  hornet.emplace(hornetImporter, "resources/hollow-knight-hornet/hornet1.gltf",
                  "hornet", "spear nail", glm::vec3(0.0f),
                  glm::quat(1.0, 0.0, 0.0, 0.0), glm::vec3(2.5f));
 

@@ -38,6 +38,9 @@ class IAnimator {
 public:
   virtual ~IAnimator() = default;
   virtual std::optional<glm::mat4> GetGlobalNodeTransform(std::string) = 0;
+  virtual std::optional<glm::mat4> getMeshTransform(unsigned int meshIndex,
+                                                    float timeInTicks) = 0;
+  virtual float getFrame() = 0;
 };
 
 // struct MeshAnimationChannel {
@@ -162,14 +165,21 @@ public:
 
       glm::mat4 localTransform = glm::mat4(1.0f);
       auto animatedNodeTransform = animator.GetGlobalNodeTransform(mesh.name);
-      if (animatedNodeTransform.has_value()) {
-        if (!mesh.hasBones) {
-          localTransform = animatedNodeTransform.value();
+
+      std::optional<glm::mat4> animTrans;
+      if (!mesh.hasBones) {
+        animTrans = animator.getMeshTransform(i, animator.getFrame());
+        if (!animTrans.has_value()) {
+          localTransform = meshNodeTransforms[mesh.nodeName];
+        } else {
+          localTransform = animTrans.value();
         }
-      } else {
-        localTransform = meshNodeTransforms[mesh.nodeName];
       }
       glm::mat4 finalTransform = objectModel * localTransform;
+
+      // if (animTrans.has_value()) {
+      //   finalTransform *= *animTrans;
+      // }
 
       shader.setMat4("model", finalTransform);
 

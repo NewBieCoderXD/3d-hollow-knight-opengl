@@ -42,6 +42,7 @@ public:
       return duration / 2.0f - std::abs(m_CurrentTime - duration / 2.0f);
     }
     float frame = m_CurrentTime;
+
     if (!clearAfterDone && m_CurrentTime > duration) {
       frame = duration - 0.1f;
     }
@@ -106,6 +107,7 @@ public:
 
       // Accumulate animation time internally
       this->m_CurrentTime += deltaTime * ticksPerSecond;
+      std::cout << "123 " << " " << m_CurrentTime << std::endl;
 
       // Wrap around the animation duration
       if (clearAfterDone && this->m_CurrentTime > this->duration) {
@@ -194,7 +196,9 @@ public:
       int boneID = boneInfoMap.at(nodeName).id;
       glm::mat4 offsetMatrix = boneInfoMap.at(nodeName).offset;
       // The final skinning matrix (to deform vertices in the shader)
-      m_FinalBoneMatrices[boneID] = globalTransformation * offsetMatrix;
+      m_FinalBoneMatrices[boneID] =
+          m_CurrentAnimation->m_GlobalInverseTransform * globalTransformation *
+          offsetMatrix;
     }
 
     for (int i = 0; i < node->childrenCount; i++)
