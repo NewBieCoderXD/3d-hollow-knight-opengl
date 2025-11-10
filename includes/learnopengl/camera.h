@@ -124,8 +124,10 @@ public:
     if (constrainPitch) {
       if (Pitch > 89.0f)
         Pitch = 89.0f;
-      if (Pitch < -89.0f)
-        Pitch = -89.0f;
+      if (Pitch < 0.0f)
+        Pitch = 0.0f;
+      // if (Pitch < -89.0f)
+      //   Pitch = -89.0f;
     }
 
     // update Front, Right and Up Vectors using the updated Euler angles

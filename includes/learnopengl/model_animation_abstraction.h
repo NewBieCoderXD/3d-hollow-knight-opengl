@@ -10,6 +10,7 @@
 #include "learnopengl/bone.h"
 #include "learnopengl/box.hpp"
 #include "learnopengl/model_animation.h"
+#include <algorithm>
 #include <assimp/Importer.hpp>
 #include <learnopengl/filesystem.h>
 #include <memory>
@@ -179,13 +180,13 @@ public:
   void updatePosition(float deltaTime) {
     if (glm::length(this->velocity) > 0.01) {
       this->position += this->velocity * deltaTime;
-      this->position.y = 0;
+      this->position.y = std::max(this->position.y, 0.0f);
     }
     this->velocity += this->acceleration * deltaTime;
     this->velocity *= (1 - this->friction * deltaTime);
-    if (this->model->name == "hornet") {
-      std::cout << glm::to_string(this->velocity) << std::endl;
-    }
+    // if (this->model->name == "hornet") {
+    //   std::cout << glm::to_string(this->velocity) << std::endl;
+    // }
   }
 
   void draw(glm::mat4 parentMtx, glm::mat4 projection, glm::mat4 view,
@@ -233,7 +234,7 @@ public:
       hitboxShader.setMat4("view", view);
 
       glm::vec3 pos = glm::vec3(modelMtx[3]);
-      pos.y = modelSize.y / 2.0;
+      pos.y += modelSize.y / 2.0;
       hitbox->setVisible(true);
       hitbox->draw(glm::translate(glm::mat4(1.0f), pos), hitboxShader);
 

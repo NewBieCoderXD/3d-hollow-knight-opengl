@@ -5,5 +5,5 @@ const float HORNET_DASH_SPEED = 5.0f;
 const float HORNET_SPEED = 0.5f;
 const float KNIGHT_SPEED = 0.6f;
 const float KNOCKBACK_SPEED = 20.0f;
-const float KNIGHT_ATTACK_DELAY = 3.0f;
+const float KNIGHT_ATTACK_DELAY = 1.0f;
 const char *AUDIO_SHAW = "resources/audio/shaw.mp3";

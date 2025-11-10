@@ -18,11 +18,13 @@
 
 #include <learnopengl/animator.h>
 
+#include <chrono>
 #include <cstdlib>
 #include <ctime>
 #include <iostream>
 #include <memory>
 #include <optional>
+#include <random>
 
 #define MINIAUDIO_IMPLEMENTATION
 #include <miniaudio.h>
@@ -67,7 +69,17 @@ inline bool CheckAABBCollision(const glm::vec3 &posA, const glm::vec3 &sizeA,
   return collisionX && collisionY && collisionZ;
 }
 
-enum class HornetState { LUNGE_WAIT, LUNGE, DASH_WAIT, DASH, IDLE, DEAD };
+enum class HornetState {
+  LUNGE_WAIT,
+  LUNGE,
+  DASH_WAIT,
+  DASH,
+  JUMP_WAIT,
+  JUMP,
+  JUMP_DOWN,
+  IDLE,
+  DEAD
+};
 
 HornetState hornetState = HornetState::IDLE;
 float lastHornetStateSet = 0.0f;
@@ -80,24 +92,27 @@ enum class KnightState { ATTACKING, IDLE };
 KnightState knightState = KnightState::IDLE;
 float lastKnightStateSet = 0.0f;
 
+std::default_random_engine randomEngine;
+std::uniform_real_distribution<float> toOneDist(0.0f, 1.0f);
+std::uniform_real_distribution<float> toTenDist(0.0f, 10.f);
+
 void randomHornetState() {
   if (hornetState == HornetState::DEAD) {
     return;
   }
-  // hornetState = HornetState::LUNGE_WAIT;
+
+  // hornetState = HornetState::JUMP_WAIT;
+
   if (glm::length(hornet->position - knight->position) < 6.0) {
-    int action = (std::rand() % 3);
+    float action = toTenDist(randomEngine);
+    // int action = (std::rand() % 3);
     // hornetState = static_cast<HornetState>(action);
-    switch (action) {
-    case 0:
+    if (action < 3.0) {
       hornetState = HornetState::LUNGE_WAIT;
-      break;
-    case 1:
-      hornetState = HornetState::LUNGE_WAIT;
-      break;
-    case 2:
+    } else if (action < 9.0) {
+      hornetState = HornetState::JUMP_WAIT;
+    } else {
       hornetState = HornetState::DASH_WAIT;
-      break;
     }
   } else {
     hornetState = HornetState::DASH_WAIT;
@@ -116,6 +131,9 @@ void randomHornetState() {
     break;
   }
   case HornetState::IDLE:
+  case HornetState::JUMP:
+  case HornetState::JUMP_DOWN:
+  case HornetState::DASH:
   case HornetState::DEAD:
   case HornetState::LUNGE: {
     break;
@@ -127,8 +145,23 @@ void randomHornetState() {
     lastHornetStateSet = lastFrame;
     break;
   }
-  case HornetState::DASH: {
+  case HornetState::JUMP_WAIT: {
+    glm::vec3 above = hornet->position;
+    float random_x = toOneDist(randomEngine) * 5.0;
+    float random_y = 2.0;
+    float random_z = sqrt(pow(5.0, 2) - pow(random_x, 2));
+    above = above + glm::vec3(random_x, random_y, random_z);
+
+    // create rotation matrix from direction
+    glm::mat4 lookAtMatrix =
+        glm::lookAt(hornet->position, above, glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::mat3 rotationMatrix = glm::mat3(glm::transpose(lookAtMatrix));
     hornet->rotation = glm::quat_cast(rotationMatrix);
+
+    ma_sound_start(preLoadedSounds[AUDIO_SHAW].get());
+    hornet->setAnimation("point_forward", AnimationRunType::FORWARD, false);
+    hornetState = HornetState::JUMP;
+    lastHornetStateSet = lastFrame;
     break;
   }
   }
@@ -163,6 +196,38 @@ void updateHornetState() {
   case HornetState::DASH: {
     hornet->velocity -= hornet->getFront() * HORNET_DASH_SPEED;
     if (lastFrame > lastHornetStateSet + 0.6f) {
+      hornetState = HornetState::IDLE;
+      lastHornetStateSet = lastFrame;
+    }
+    break;
+  }
+  case HornetState::JUMP_WAIT: {
+    if (lastFrame > lastHornetStateSet + 2.0f) {
+      hornetState = HornetState::JUMP;
+      lastHornetStateSet = lastFrame;
+    }
+    break;
+  }
+  case HornetState::JUMP: {
+    if (lastFrame < lastHornetStateSet + 1.2f && hornet->position.y < 4.0f) {
+      hornet->velocity -= hornet->getFront() * HORNET_DASH_SPEED;
+    } else {
+      glm::mat4 lookAtMatrix = glm::lookAt(hornet->position, knight->position,
+                                           glm::vec3(0.0f, 1.0f, 0.0f));
+      glm::mat3 rotationMatrix = glm::mat3(glm::transpose(lookAtMatrix));
+      hornet->rotation = glm::quat_cast(rotationMatrix);
+    }
+    if (lastFrame > lastHornetStateSet + 2.5f) {
+      hornetState = HornetState::JUMP_DOWN;
+      lastHornetStateSet = lastFrame;
+    }
+    break;
+  }
+  case HornetState::JUMP_DOWN: {
+    if (hornet->position.y > 0.01f) {
+      hornet->velocity -= hornet->getFront() * HORNET_DASH_SPEED;
+    }
+    if (lastFrame > lastHornetStateSet + 3.0f) {
       hornetState = HornetState::IDLE;
       lastHornetStateSet = lastFrame;
     }
@@ -245,7 +310,9 @@ int main() {
   // -----------------------------
   glEnable(GL_DEPTH_TEST);
 
-  std::srand(static_cast<unsigned int>(std::time(nullptr)));
+  unsigned seed =
+      std::chrono::high_resolution_clock::now().time_since_epoch().count();
+  randomEngine = std::default_random_engine(seed);
 
   ma_result result = ma_engine_init(NULL, &audioEngine);
   assert(result == MA_SUCCESS);
@@ -371,7 +438,8 @@ int main() {
     updateKnightState();
 
     // Check if knight body hit hornet
-    if (lastFrame > DAMAGE_COOLDOWN + knight->lastHit &&
+    if (hornetState != HornetState::DEAD &&
+        lastFrame > DAMAGE_COOLDOWN + knight->lastHit &&
         CheckAABBCollision(knight->position, knight->modelSize,
                            hornet->position, hornet->modelSize)) {
       // knight->position +=
@@ -384,7 +452,8 @@ int main() {
     }
 
     // Check if knight's nail hit hornet
-    if (knightState == KnightState::ATTACKING &&
+    if (hornetState != HornetState::DEAD &&
+        knightState == KnightState::ATTACKING &&
         lastFrame > DAMAGE_COOLDOWN + hornet->lastHit &&
         CheckAABBCollision(knight->getWeaponPosition(),
                            knight->model->weaponSize, hornet->position,
@@ -400,7 +469,8 @@ int main() {
     }
 
     // Check if hornet's needle hit knight
-    if (lastFrame > DAMAGE_COOLDOWN + knight->lastHit &&
+    if (hornetState != HornetState::DEAD &&
+        lastFrame > DAMAGE_COOLDOWN + knight->lastHit &&
         CheckAABBCollision(knight->position, knight->modelSize,
                            hornet->getWeaponPosition(),
                            hornet->model->weaponSize)) {
