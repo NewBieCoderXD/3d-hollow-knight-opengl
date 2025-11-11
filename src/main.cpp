@@ -110,7 +110,7 @@ void randomHornetState() {
     // std::cout << action << std::endl;
     // int action = (std::rand() % 3);
     // hornetState = static_cast<HornetState>(action);
-    if (action < 7.0) {
+    if (action < 8.0) {
       hornetState = HornetState::LUNGE_WAIT;
     } else if (action < 9.0) {
       hornetState = HornetState::JUMP_WAIT;
@@ -155,10 +155,24 @@ void randomHornetState() {
   }
   case HornetState::JUMP_WAIT: {
     glm::vec3 above = hornet->position;
-    float random_x = toOneDist(randomEngine) * 5.0;
+    float radius = 5.0f;
     float random_y = 2.0;
-    float random_z = sqrt(pow(5.0, 2) - pow(random_x, 2));
+    float angle = toOneDist(randomEngine) * glm::two_pi<float>();
+    float random_x = cos(angle) * radius;
+    float random_z = sin(angle) * radius;
     above = above + glm::vec3(random_x, random_y, random_z);
+
+    glm::vec3 knightPos = knight->position;
+    float minDistance = 5.0f;
+
+    glm::vec3 dir = above - knightPos;
+    float dist = glm::length(dir);
+
+    // If too close, push it further away
+    if (dist < minDistance) {
+      dir = glm::normalize(dir);
+      above = knightPos + dir * minDistance;
+    }
 
     // create rotation matrix from direction
     glm::mat4 lookAtMatrix =
@@ -178,7 +192,7 @@ void randomHornetState() {
 void updateHornetState() {
   switch (hornetState) {
   case HornetState::LUNGE_WAIT: {
-    if (lastFrame > lastHornetStateSet + 1.0f) {
+    if (lastFrame > lastHornetStateSet + 0.5f) {
       hornetState = HornetState::LUNGE;
       hornet->setAnimation("lunge", AnimationRunType::FORWARD_AND_BACKWARD,
                            true);
@@ -187,14 +201,14 @@ void updateHornetState() {
     break;
   }
   case HornetState::LUNGE: {
-    if (hornet->animator.isOver() && lastFrame > lastHornetStateSet + 3.0f) {
+    if (hornet->animator.isOver() || lastFrame > lastHornetStateSet + 3.0f) {
       hornet->setAnimation("point_forward", AnimationRunType::BACKWARD, true);
       hornetState = HornetState::IDLE;
     }
     break;
   }
   case HornetState::DASH_WAIT: {
-    if (lastFrame > lastHornetStateSet + 1.0f) {
+    if (lastFrame > lastHornetStateSet + 0.5f) {
       hornetState = HornetState::DASH;
       lastHornetStateSet = lastFrame;
     }
@@ -209,7 +223,7 @@ void updateHornetState() {
     break;
   }
   case HornetState::JUMP_WAIT: {
-    if (lastFrame > lastHornetStateSet + 1.0f) {
+    if (lastFrame > lastHornetStateSet + 0.5f) {
       hornetState = HornetState::JUMP;
       lastHornetStateSet = lastFrame;
     }
@@ -224,7 +238,7 @@ void updateHornetState() {
       glm::mat3 rotationMatrix = glm::mat3(glm::transpose(lookAtMatrix));
       hornet->rotation = glm::quat_cast(rotationMatrix);
     }
-    if (lastFrame > lastHornetStateSet + 2.5f) {
+    if (lastFrame > lastHornetStateSet + 1.0f) {
       ma_sound_start(preLoadedSounds[AUDIO_HAA].get());
       hornetState = HornetState::JUMP_DOWN;
       lastHornetStateSet = lastFrame;
@@ -372,6 +386,8 @@ int main() {
   hornet.emplace(hornetImporter, "resources/hollow-knight-hornet/hornet.gltf",
                  "hornet", "spear nail", glm::vec3(0.0f),
                  glm::quat(1.0, 0.0, 0.0, 0.0), glm::vec3(2.5f));
+  hornet->maxHealth = 15;
+  hornet->health = 15;
   hornet->hitbox->scale = 0.7;
   hornet->modelSize *= 0.7f;
   hornet->model->weaponHitbox->scale = 0.7;
