@@ -32,7 +32,7 @@
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
-void processInput(GLFWwindow *window);
+void processInput(GLFWwindow *window, float deltaTime);
 void mouse_button_callback(GLFWwindow *window, int button, int action,
                            int mods);
 
@@ -42,6 +42,8 @@ unsigned int SCR_HEIGHT = 600;
 
 ma_engine audioEngine;
 std::unordered_map<std::string, std::unique_ptr<ma_sound>> preLoadedSounds;
+
+float firstRender = 0;
 
 // camera
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
@@ -101,22 +103,28 @@ void randomHornetState() {
     return;
   }
 
-  hornetState = HornetState::LUNGE_WAIT;
+  // hornetState = HornetState::LUNGE_WAIT;
 
-  // if (glm::length(hornet->position - knight->position) < 6.0) {
-  //   float action = toTenDist(randomEngine);
-  //   // int action = (std::rand() % 3);
-  //   // hornetState = static_cast<HornetState>(action);
-  //   if (action < 3.0) {
-  //     hornetState = HornetState::LUNGE_WAIT;
-  //   } else if (action < 9.0) {
-  //     hornetState = HornetState::JUMP_WAIT;
-  //   } else {
-  //     hornetState = HornetState::DASH_WAIT;
-  //   }
-  // } else {
-  //   hornetState = HornetState::DASH_WAIT;
-  // }
+  if (glm::length(hornet->position - knight->position) < 6.0) {
+    float action = toTenDist(randomEngine);
+    // std::cout << action << std::endl;
+    // int action = (std::rand() % 3);
+    // hornetState = static_cast<HornetState>(action);
+    if (action < 7.0) {
+      hornetState = HornetState::LUNGE_WAIT;
+    } else if (action < 9.0) {
+      hornetState = HornetState::JUMP_WAIT;
+    } else {
+      hornetState = HornetState::DASH_WAIT;
+    }
+  } else {
+    float action = toTenDist(randomEngine);
+    if (action < 5.0) {
+      hornetState = HornetState::JUMP_WAIT;
+    } else {
+      hornetState = HornetState::DASH_WAIT;
+    }
+  }
   lastHornetAttack = lastFrame;
 
   glm::mat4 lookAtMatrix = glm::lookAt(hornet->position, knight->position,
@@ -354,11 +362,17 @@ int main() {
   knight.emplace(knightImporter, "resources/hollow-knight-the-knight.glb",
                  "knight", "Knight_Nail");
   knight->position.x = 3.0;
+  knight->model->weaponHitbox->scale = 2.0;
+  knight->model->weaponSize *= 2.0;
 
   Assimp::Importer hornetImporter;
-  hornet.emplace(hornetImporter, "resources/hollow-knight-hornet/hornet1.gltf",
+  hornet.emplace(hornetImporter, "resources/hollow-knight-hornet/hornet.gltf",
                  "hornet", "spear nail", glm::vec3(0.0f),
                  glm::quat(1.0, 0.0, 0.0, 0.0), glm::vec3(2.5f));
+  hornet->hitbox->scale = 0.7;
+  hornet->modelSize *= 0.7f;
+  hornet->model->weaponHitbox->scale = 0.7;
+  hornet->model->weaponSize *= 0.7;
 
   Assimp::Importer stoneGroundImporter;
   ModelAnimationAbs stoneGround(stoneGroundImporter,
@@ -386,9 +400,13 @@ int main() {
     deltaTime = currentFrame - lastFrame;
     lastFrame = currentFrame;
 
+    if (firstRender == 0) {
+      firstRender = currentFrame;
+    }
+
     // input
     // -----
-    processInput(window);
+    processInput(window, deltaTime);
 
     // render
     // ------
@@ -397,7 +415,7 @@ int main() {
 
     knight->updatePosition(deltaTime);
 
-    camera.LookAt = knight->position;
+    camera.LookAt = knight->position + glm::vec3(0, 5.0f, 0.0);
     camera.UpdateCameraVectors();
 
     // view/projection transformations
@@ -430,12 +448,14 @@ int main() {
     stoneGround.draw(model, projection, view, texturedModelWithBonesShader,
                      simple3dShader, deltaTime, lastFrame);
 
-    if (hornetState == HornetState::IDLE &&
-        lastFrame > lastHornetAttack + HORNET_ATTACK_COOLDOWN) {
-      randomHornetState();
+    if (currentFrame - firstRender > 3.0f) {
+      if (hornetState == HornetState::IDLE &&
+          lastFrame > lastHornetAttack + HORNET_ATTACK_COOLDOWN) {
+        randomHornetState();
+      }
+      updateHornetState();
+      updateKnightState();
     }
-    updateHornetState();
-    updateKnightState();
 
     // Check if knight body hit hornet
     if (hornetState != HornetState::DEAD &&
@@ -510,7 +530,7 @@ int main() {
 // process all input: query GLFW whether relevant keys are pressed/released this
 // frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
-void processInput(GLFWwindow *window) {
+void processInput(GLFWwindow *window, float deltaTime) {
   if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
     glfwSetWindowShouldClose(window, true);
 
@@ -535,7 +555,7 @@ void processInput(GLFWwindow *window) {
 
   if (glm::length(moveDir) > 0.001f) {
     moveDir = glm::normalize(moveDir);
-    knight->velocity += moveDir * KNIGHT_SPEED;
+    knight->velocity += moveDir * KNIGHT_ACC * deltaTime;
     // glm::vec3 newPos = knight->position + moveDir * KNIGHT_SPEED * deltaTime;
     // newPos.y = std::max(0.0f, newPos.y);
     // knight->position = newPos;
@@ -585,8 +605,7 @@ void mouse_callback(GLFWwindow *window, double xposIn, double yposIn) {
 
   // Calculate offsets based on the change from the last position
   float xoffset = xpos - lastX; // <--- Use local float declaration here
-  float yoffset =
-      lastY - ypos; // reversed since y-coordinates go from bottom to top
+  float yoffset = ypos - lastY;
 
   lastX = xpos;
   lastY = ypos;

@@ -1,10 +1,13 @@
 #pragma once
+#include "glm/ext/matrix_transform.hpp"
 #include "learnopengl/shader.h"
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 
 class DebugBox {
 public:
+  float scale = 1.0f;
+
   DebugBox(const glm::vec3 &minCorner, const glm::vec3 &maxCorner)
       : color(1.0f, 0.0f, 0.0f), visible(false) {
     initBox(minCorner, maxCorner);
@@ -16,8 +19,10 @@ public:
     if (!visible)
       return;
 
+    glm::mat4 final = glm::scale(model, glm::vec3(this->scale));
+
     // Set uniforms the box controls (only model + color)
-    shaderProgram.setMat4("model", model);
+    shaderProgram.setMat4("model", final);
 
     GLint colorLoc = glGetUniformLocation(shaderProgram.ID, "color");
     if (colorLoc != -1)
