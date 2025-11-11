@@ -192,7 +192,7 @@ public:
   void draw(glm::mat4 parentMtx, glm::mat4 projection, glm::mat4 view,
             Shader &shader, Shader &hitboxShader, float deltaTime,
             float lastFrame) {
-    if (health < 0) {
+    if (health <= 0) {
       return;
     }
     shader.use();

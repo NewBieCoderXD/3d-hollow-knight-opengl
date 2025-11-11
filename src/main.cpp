@@ -166,9 +166,8 @@ void randomHornetState() {
     glm::mat3 rotationMatrix = glm::mat3(glm::transpose(lookAtMatrix));
     hornet->rotation = glm::quat_cast(rotationMatrix);
 
-    ma_sound_start(preLoadedSounds[AUDIO_SHAW].get());
+    ma_sound_start(preLoadedSounds[AUDIO_EDINO].get());
     hornet->setAnimation("point_forward", AnimationRunType::FORWARD, false);
-    hornetState = HornetState::JUMP;
     lastHornetStateSet = lastFrame;
     break;
   }
@@ -203,14 +202,14 @@ void updateHornetState() {
   }
   case HornetState::DASH: {
     hornet->velocity -= hornet->getFront() * HORNET_DASH_SPEED;
-    if (lastFrame > lastHornetStateSet + 0.6f) {
+    if (lastFrame > lastHornetStateSet + 0.3f) {
       hornetState = HornetState::IDLE;
       lastHornetStateSet = lastFrame;
     }
     break;
   }
   case HornetState::JUMP_WAIT: {
-    if (lastFrame > lastHornetStateSet + 2.0f) {
+    if (lastFrame > lastHornetStateSet + 1.0f) {
       hornetState = HornetState::JUMP;
       lastHornetStateSet = lastFrame;
     }
@@ -226,18 +225,21 @@ void updateHornetState() {
       hornet->rotation = glm::quat_cast(rotationMatrix);
     }
     if (lastFrame > lastHornetStateSet + 2.5f) {
+      ma_sound_start(preLoadedSounds[AUDIO_HAA].get());
       hornetState = HornetState::JUMP_DOWN;
       lastHornetStateSet = lastFrame;
     }
     break;
   }
   case HornetState::JUMP_DOWN: {
-    if (hornet->position.y > 0.01f) {
-      hornet->velocity -= hornet->getFront() * HORNET_DASH_SPEED;
-    }
-    if (lastFrame > lastHornetStateSet + 3.0f) {
-      hornetState = HornetState::IDLE;
-      lastHornetStateSet = lastFrame;
+    if (lastFrame > lastHornetStateSet + 0.5f) {
+      if (hornet->position.y > 0.01f) {
+        hornet->velocity -= hornet->getFront() * HORNET_DASH_SPEED;
+      }
+      if (lastFrame > lastHornetStateSet + 3.0f) {
+        hornetState = HornetState::IDLE;
+        lastHornetStateSet = lastFrame;
+      }
     }
     break;
   }
@@ -325,7 +327,8 @@ int main() {
   ma_result result = ma_engine_init(NULL, &audioEngine);
   assert(result == MA_SUCCESS);
 
-  std::map<std::string, float> soundToVolume = {{AUDIO_SHAW, 0.2f}};
+  std::map<std::string, float> soundToVolume = {
+      {AUDIO_SHAW, 0.2f}, {AUDIO_EDINO, 0.2f}, {AUDIO_HAA, 0.2f}};
   for (auto [file, volume] : soundToVolume) {
     std::unique_ptr<ma_sound> pSound = std::make_unique<ma_sound>();
     new_sound(pSound, file, volume);
@@ -486,6 +489,9 @@ int main() {
 
       hornet->lastHit = lastFrame;
       hornet->health -= 1;
+      if (hornet->health == 0) {
+        hornetState = HornetState::DEAD;
+      }
     }
 
     // Check if hornet's needle hit knight

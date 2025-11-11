@@ -1,9 +1,11 @@
 const float DAMAGE_COOLDOWN = 2.0f;
 const float DAMAGE_EFFECT = 0.4f;
 const float HORNET_ATTACK_COOLDOWN = 3.0f;
-const float HORNET_DASH_SPEED = 5.0f;
+const float HORNET_DASH_SPEED = 10.0f;
 const float HORNET_SPEED = 0.5f;
 const float KNIGHT_ACC = 50.0f;
 const float KNOCKBACK_SPEED = 20.0f;
 const float KNIGHT_ATTACK_DELAY = 1.0f;
 const char *AUDIO_SHAW = "resources/audio/shaw.mp3";
+const char *AUDIO_EDINO = "resources/audio/hornet_edino.mp3";
+const char *AUDIO_HAA = "resources/audio/hornet_haa.mp3";

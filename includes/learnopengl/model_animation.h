@@ -164,7 +164,8 @@ public:
       Mesh mesh = meshes[i];
 
       glm::mat4 localTransform = glm::mat4(1.0f);
-      auto animatedNodeTransform = animator.GetGlobalNodeTransform(mesh.name);
+      // auto animatedNodeTransform =
+      // animator.GetGlobalNodeTransform(mesh.name);
 
       std::optional<glm::mat4> animTrans;
       if (!mesh.hasBones) {
