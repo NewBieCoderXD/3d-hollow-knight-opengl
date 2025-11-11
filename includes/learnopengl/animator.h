@@ -107,7 +107,6 @@ public:
 
       // Accumulate animation time internally
       this->m_CurrentTime += deltaTime * ticksPerSecond;
-      std::cout << "123 " << " " << m_CurrentTime << std::endl;
 
       // Wrap around the animation duration
       if (clearAfterDone && this->m_CurrentTime > this->duration) {
