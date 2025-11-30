@@ -4,14 +4,14 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-class Plane {
+class PlaneWithControls {
 public:
   unsigned int VAO, VBO;
   glm::vec3 position;
   glm::vec3 scale;
   glm::vec3 rotation; // Euler angles
 
-  Plane(float size = 10.0f, unsigned int tex = 0)
+  PlaneWithControls(float size = 10.0f, unsigned int tex = 0)
       : position(0.0f), scale(glm::vec3(size)), rotation(0.0f) {
     float vertices[] = {
         // positions (X, Y, Z)

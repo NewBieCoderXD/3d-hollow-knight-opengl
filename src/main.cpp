@@ -1,7 +1,7 @@
 #include "glm/geometric.hpp"
 #include "learnopengl/bar.h"
+#include "learnopengl/group_plane.hpp"
 #include "learnopengl/model_animation.h"
-#include "learnopengl/plane.h"
 #include <GLFW/glfw3.h>
 #include <cmath>
 #include <glad/glad.h>
@@ -361,9 +361,9 @@ int main() {
 
   Shader simple2dShader("src/simple2d.vert", "src/simple3d.frag");
 
-  Plane ground(1.0f);
-  ground.position = glm::vec3(0.0f, 0.0f, 0.0f);
-  ground.rotation = glm::vec3(0.0f);
+  Shader groundShader("src/ground.vert", "src/ground.frag");
+
+  GroundPlane ground("resources/grass_ground.png", 10000.0, 500.0);
 
   // load models
   // -----------
@@ -393,11 +393,11 @@ int main() {
   hornet->model->weaponHitbox->scale = 0.7;
   hornet->model->weaponSize *= 0.7;
 
-  Assimp::Importer stoneGroundImporter;
-  ModelAnimationAbs stoneGround(stoneGroundImporter,
-                                "resources/stone_ground_01_a.glb",
-                                "stoneGround", "");
-  // stoneGround.position.y = 4.0f;
+  // Assimp::Importer stoneGroundImporter;
+  // ModelAnimationAbs stoneGround(stoneGroundImporter,
+  //                               "resources/stone_ground_01_a.glb",
+  //                               "stoneGround", "");
+  // // stoneGround.position.y = 4.0f;
 
   HealthBar playerHealth(200.0f, 20.0f, glm::vec2(10.0f, 10.0f),
                          glm::vec3(1.0f, 0.0f, 0.0f));
@@ -464,8 +464,7 @@ int main() {
     hornet->draw(model, projection, view, texturedModelWithBonesShader,
                  simple3dShader, deltaTime, lastFrame);
 
-    stoneGround.draw(model, projection, view, texturedModelWithBonesShader,
-                     simple3dShader, deltaTime, lastFrame);
+    // ground.Draw(groundShader.ID, view, projection);
 
     if (currentFrame - firstRender > 3.0f) {
       if (hornetState == HornetState::IDLE &&
