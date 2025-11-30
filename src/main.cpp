@@ -464,7 +464,7 @@ int main() {
     hornet->draw(model, projection, view, texturedModelWithBonesShader,
                  simple3dShader, deltaTime, lastFrame);
 
-    // ground.Draw(groundShader.ID, view, projection);
+    ground.Draw(groundShader.ID, view, projection);
 
     if (currentFrame - firstRender > 3.0f) {
       if (hornetState == HornetState::IDLE &&
