@@ -6,6 +6,10 @@
 #include <cmath>
 #include <glad/glad.h>
 
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_opengl3.h>
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -71,6 +75,8 @@ inline bool CheckAABBCollision(const glm::vec3 &posA, const glm::vec3 &sizeA,
   return collisionX && collisionY && collisionZ;
 }
 
+bool on_menu = true;
+
 enum class HornetState {
   LUNGE_WAIT,
   LUNGE,
@@ -97,6 +103,14 @@ float lastKnightStateSet = 0.0f;
 std::default_random_engine randomEngine;
 std::uniform_real_distribution<float> toOneDist(0.0f, 1.0f);
 std::uniform_real_distribution<float> toTenDist(0.0f, 10.f);
+
+std::unique_ptr<HealthBar> playerHealth;
+
+GLFWwindow *window;
+
+ImGuiIO *imguiIO;
+ImFont *font24;
+ImFont *font50;
 
 void randomHornetState() {
   if (hornetState == HornetState::DEAD) {
@@ -285,6 +299,78 @@ void new_sound(std::unique_ptr<ma_sound> &sound, std::string file,
   ma_sound_set_volume(sound.get(), volume);
 }
 
+void onStartGame() {
+  hornetState = HornetState::IDLE;
+  hornet->health = 15;
+  hornet->position = glm::vec3(0.0, 0.0, 0.0);
+  hornet->velocity = glm::vec3(0.0);
+  lastHornetStateSet = 0.0f;
+  lastHornetAttack = 0.0f;
+
+  knightState = KnightState::IDLE;
+  currentHealth = 5;
+  lastKnightStateSet = 0.0f;
+  knight->position = glm::vec3(3.0, 0.0, 0.0);
+  knight->velocity = glm::vec3(0.0);
+}
+
+void RenderMenu() {
+  // window
+  const ImGuiViewport *viewport = ImGui::GetMainViewport();
+
+  // 2. Set the next window's position and size to cover the viewport
+  ImGui::SetNextWindowPos(viewport->WorkPos);
+  ImGui::SetNextWindowSize(viewport->WorkSize);
+
+  ImGui::PushFont(font50);
+  ImGuiWindowFlags window_flags =
+      ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoTitleBar |
+      ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
+      ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus |
+      ImGuiWindowFlags_NoNavFocus;
+  ImGui::Begin("Main Window", nullptr, window_flags);
+
+  ImGui::SetCursorPosX(ImGui::GetWindowSize().x * 0.5f - 150.0f);
+  ImGui::Text("Hole Low Knight");
+  ImGui::Spacing();
+  ImGui::Spacing();
+  float button_width = ImGui::GetWindowSize().x * 0.2f;
+  float button_height = ImGui::GetWindowSize().x * 0.10f;
+  ImGui::SetCursorPosX(ImGui::GetWindowSize().x * 0.5f - (button_width / 2));
+
+  if (ImGui::Button("Start Game", ImVec2(button_width, button_height))) {
+    on_menu = false;
+    onStartGame();
+    std::cout << "Starting the game!" << std::endl;
+  }
+
+  ImGui::Spacing();
+  ImGui::SetCursorPosX(ImGui::GetWindowSize().x * 0.5f - (button_width / 2));
+
+  // 2. Settings Button
+  if (ImGui::Button("Settings", ImVec2(button_width, button_height))) {
+    std::cout << "Opening Settings panel..." << std::endl;
+  }
+
+  ImGui::Spacing();
+  ImGui::SetCursorPosX(ImGui::GetWindowSize().x * 0.5f - (button_width / 2));
+
+  if (ImGui::Button("Quit", ImVec2(button_width, button_height))) {
+    glfwSetWindowShouldClose(window, true);
+    std::cout << "Quitting application." << std::endl;
+  }
+  ImGui::PopFont();
+  ImGui::End();
+}
+
+void playerTakeDamage(uint damage) {
+  currentHealth -= damage;
+  if (currentHealth == 0) {
+    on_menu = true;
+  }
+  playerHealth->setHealth(currentHealth, maxHealth);
+}
+
 int main() {
   // glfw: initialize and configure
   // ------------------------------
@@ -302,8 +388,8 @@ int main() {
   const GLFWvidmode *mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
   SCR_WIDTH = mode->width;
   SCR_HEIGHT = mode->height;
-  GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL",
-                                        glfwGetPrimaryMonitor(), NULL);
+  window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL",
+                            glfwGetPrimaryMonitor(), NULL);
   if (window == NULL) {
     const char *description;
     int code = glfwGetError(&description);
@@ -338,6 +424,8 @@ int main() {
       std::chrono::high_resolution_clock::now().time_since_epoch().count();
   randomEngine = std::default_random_engine(seed);
 
+  // Audio
+  // ----------------------
   ma_result result = ma_engine_init(NULL, &audioEngine);
   assert(result == MA_SUCCESS);
 
@@ -348,6 +436,18 @@ int main() {
     new_sound(pSound, file, volume);
     preLoadedSounds[file] = std::move(pSound);
   }
+
+  // GUI
+  // -----------------
+  ImGui::CreateContext();
+  imguiIO = &ImGui::GetIO();
+  font24 = imguiIO->Fonts->AddFontFromFileTTF(
+      "resources/fonts/ComicSansMS3.ttf", 24.0f);
+  font50 = imguiIO->Fonts->AddFontFromFileTTF(
+      "resources/fonts/ComicSansMS3.ttf", 50.0f);
+  ImGui_ImplGlfw_InitForOpenGL(window,
+                               true); // 'true' sets up callbacks for input
+  ImGui_ImplOpenGL3_Init("#version 330");
 
   // build and compile shaders
   // -------------------------
@@ -371,6 +471,9 @@ int main() {
   // model).
   stbi_set_flip_vertically_on_load(false);
 
+  playerHealth = std::make_unique<HealthBar>(HealthBar(
+      200.0f, 20.0f, glm::vec2(10.0f, 10.0f), glm::vec3(1.0f, 0.0f, 0.0f)));
+
   Assimp::Importer knightImporter;
   // knight.emplace(knightImporter,
   // "resources/hollow-knight-hornet/hornet2.glb",
@@ -387,7 +490,6 @@ int main() {
                  "hornet", "spear nail", glm::vec3(0.0f),
                  glm::quat(1.0, 0.0, 0.0, 0.0), glm::vec3(2.5f));
   hornet->maxHealth = 15;
-  hornet->health = 15;
   hornet->hitbox->scale = 0.7;
   hornet->modelSize *= 0.7f;
   hornet->model->weaponHitbox->scale = 0.7;
@@ -398,9 +500,6 @@ int main() {
   //                               "resources/stone_ground_01_a.glb",
   //                               "stoneGround", "");
   // // stoneGround.position.y = 4.0f;
-
-  HealthBar playerHealth(200.0f, 20.0f, glm::vec2(10.0f, 10.0f),
-                         glm::vec3(1.0f, 0.0f, 0.0f));
 
   // tell GLFW to capture our mouse
   glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -413,129 +512,155 @@ int main() {
   // render loop
   // -----------
   while (!glfwWindowShouldClose(window)) {
-    // per-frame time logic
-    // --------------------
-    float currentFrame = static_cast<float>(glfwGetTime());
-    deltaTime = currentFrame - lastFrame;
-    lastFrame = currentFrame;
+    glfwPollEvents();
 
-    if (firstRender == 0) {
-      firstRender = currentFrame;
-    }
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
 
-    // input
-    // -----
-    processInput(window, deltaTime);
+    if (on_menu) {
+      glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 
-    // render
-    // ------
-    glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+      RenderMenu();
 
-    knight->updatePosition(deltaTime);
+      ImGui::Render();
 
-    camera.LookAt = knight->position + glm::vec3(0, 5.0f, 0.0);
-    camera.UpdateCameraVectors();
+      glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // view/projection transformations
-    glm::mat4 projection =
-        glm::perspective(glm::radians(camera.Zoom),
-                         (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-    glm::mat4 view = camera.GetViewMatrix();
+      ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    } else {
+      glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+      // per-framema_engine *pEngine time logic
+      // --------------------
+      float currentFrame = static_cast<float>(glfwGetTime());
+      deltaTime = currentFrame - lastFrame;
+      lastFrame = currentFrame;
 
-    // texturedModelWithBonesShader.use();
-
-    // texturedModelShader.use();
-
-    // simple3dShader.use();
-    // simple3dShader.setMat4("projection", projection);
-    // simple3dShader.setMat4("view", view);
-
-    // ground.Draw(simple3dShader);
-
-    // render the loaded model
-    glm::mat4 model = glm::mat4(1.0f);
-    // Knight position is already updated above
-    knight->draw(model, projection, view, texturedModelWithBonesShader,
-                 simple3dShader, deltaTime, lastFrame);
-
-    model = glm::mat4(1.0f);
-    hornet->updatePosition(deltaTime);
-    hornet->draw(model, projection, view, texturedModelWithBonesShader,
-                 simple3dShader, deltaTime, lastFrame);
-
-    ground.Draw(groundShader.ID, view, projection);
-
-    if (currentFrame - firstRender > 3.0f) {
-      if (hornetState == HornetState::IDLE &&
-          lastFrame > lastHornetAttack + HORNET_ATTACK_COOLDOWN) {
-        randomHornetState();
+      if (firstRender == 0) {
+        firstRender = currentFrame;
       }
-      updateHornetState();
-      updateKnightState();
-    }
 
-    // Check if knight body hit hornet
-    if (hornetState != HornetState::DEAD &&
-        lastFrame > DAMAGE_COOLDOWN + knight->lastHit &&
-        CheckAABBCollision(knight->position, knight->modelSize,
-                           hornet->position, hornet->modelSize)) {
-      // knight->position +=
-      //     glm::normalize(knight->position - hornet->position) * 1.0f;
-      knight->velocity +=
-          glm::normalize(knight->position - hornet->position) * KNOCKBACK_SPEED;
-      currentHealth -= 1;
-      playerHealth.setHealth(currentHealth, maxHealth);
-      knight->lastHit = lastFrame;
-    }
+      // input
+      // -----
+      processInput(window, deltaTime);
 
-    // Check if knight's nail hit hornet
-    if (hornetState != HornetState::DEAD &&
-        knightState == KnightState::ATTACKING &&
-        lastFrame > DAMAGE_COOLDOWN + hornet->lastHit &&
-        CheckAABBCollision(knight->getWeaponPosition(),
-                           knight->model->weaponSize, hornet->position,
-                           hornet->modelSize)) {
-      // std::cout << "HIT " << lastFrame << std::endl;
-      // hornet->position +=
-      //     glm::normalize(hornet->position - knight->position) * 1.0f;
-      hornet->velocity +=
-          glm::normalize(hornet->position - knight->position) * KNOCKBACK_SPEED;
+      // render
+      // ------
+      glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-      hornet->lastHit = lastFrame;
-      hornet->health -= 1;
-      if (hornet->health == 0) {
-        hornetState = HornetState::DEAD;
+      knight->updatePosition(deltaTime);
+
+      camera.LookAt = knight->position + glm::vec3(0, 5.0f, 0.0);
+      camera.UpdateCameraVectors();
+
+      // view/projection transformations
+      glm::mat4 projection =
+          glm::perspective(glm::radians(camera.Zoom),
+                           (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+      glm::mat4 view = camera.GetViewMatrix();
+
+      // texturedModelWithBonesShader.use();
+
+      // texturedModelShader.use();
+
+      // simple3dShader.use();
+      // simple3dShader.setMat4("projection", projection);
+      // simple3dShader.setMat4("view", view);
+
+      // ground.Draw(simple3dShader);
+
+      // render the loaded model
+      glm::mat4 model = glm::mat4(1.0f);
+      // Knight position is already updated above
+      knight->draw(model, projection, view, texturedModelWithBonesShader,
+                   simple3dShader, deltaTime, lastFrame);
+
+      model = glm::mat4(1.0f);
+      hornet->updatePosition(deltaTime);
+      hornet->draw(model, projection, view, texturedModelWithBonesShader,
+                   simple3dShader, deltaTime, lastFrame);
+
+      ground.Draw(groundShader.ID, view, projection);
+
+      if (currentFrame - firstRender > 3.0f) {
+        if (hornetState == HornetState::IDLE &&
+            lastFrame > lastHornetAttack + HORNET_ATTACK_COOLDOWN) {
+          randomHornetState();
+        }
+        updateHornetState();
+        updateKnightState();
       }
+
+      // Check if knight body hit hornet
+      if (hornetState != HornetState::DEAD &&
+          lastFrame > DAMAGE_COOLDOWN + knight->lastHit &&
+          CheckAABBCollision(knight->position, knight->modelSize,
+                             hornet->position, hornet->modelSize)) {
+        // knight->position +=
+        //     glm::normalize(knight->position - hornet->position) * 1.0f;
+        knight->velocity +=
+            glm::normalize(knight->position - hornet->position) *
+            KNOCKBACK_SPEED;
+        playerTakeDamage(1);
+        knight->lastHit = lastFrame;
+      }
+
+      // Check if knight's nail hit hornet
+      if (hornetState != HornetState::DEAD &&
+          knightState == KnightState::ATTACKING &&
+          lastFrame > DAMAGE_COOLDOWN + hornet->lastHit &&
+          CheckAABBCollision(knight->getWeaponPosition(),
+                             knight->model->weaponSize, hornet->position,
+                             hornet->modelSize)) {
+        // std::cout << "HIT " << lastFrame << std::endl;
+        // hornet->position +=
+        //     glm::normalize(hornet->position - knight->position) * 1.0f;
+        hornet->velocity +=
+            glm::normalize(hornet->position - knight->position) *
+            KNOCKBACK_SPEED;
+
+        hornet->lastHit = lastFrame;
+        hornet->health -= 1;
+        if (hornet->health == 0) {
+          on_menu = true;
+        }
+        if (hornet->health == 0) {
+          hornetState = HornetState::DEAD;
+        }
+      }
+
+      // Check if hornet's needle hit knight
+      if (hornetState != HornetState::DEAD &&
+          lastFrame > DAMAGE_COOLDOWN + knight->lastHit &&
+          CheckAABBCollision(knight->position, knight->modelSize,
+                             hornet->getWeaponPosition(),
+                             hornet->model->weaponSize)) {
+        // knight->position +=
+        //     glm::normalize(hornet->position - knight->position) * 1.0f;
+        knight->velocity +=
+            glm::normalize(knight->position - hornet->position) *
+            KNOCKBACK_SPEED;
+        playerTakeDamage(1);
+        knight->lastHit = lastFrame;
+      }
+
+      glDisable(GL_DEPTH_TEST);
+      simple2dShader.use();
+      glm::mat4 uiProjection =
+          glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT);
+      playerHealth->draw(uiProjection, simple2dShader.ID);
+      glEnable(GL_DEPTH_TEST);
     }
 
-    // Check if hornet's needle hit knight
-    if (hornetState != HornetState::DEAD &&
-        lastFrame > DAMAGE_COOLDOWN + knight->lastHit &&
-        CheckAABBCollision(knight->position, knight->modelSize,
-                           hornet->getWeaponPosition(),
-                           hornet->model->weaponSize)) {
-      // knight->position +=
-      //     glm::normalize(hornet->position - knight->position) * 1.0f;
-      knight->velocity +=
-          glm::normalize(knight->position - hornet->position) * KNOCKBACK_SPEED;
-      currentHealth -= 1;
-      playerHealth.setHealth(currentHealth, maxHealth);
-      knight->lastHit = lastFrame;
-    }
-
-    glDisable(GL_DEPTH_TEST);
-    simple2dShader.use();
-    glm::mat4 uiProjection =
-        glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT);
-    playerHealth.draw(uiProjection, simple2dShader.ID);
-    glEnable(GL_DEPTH_TEST);
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
     // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved
     // etc.)
     // -------------------------------------------------------------------------------
     glfwSwapBuffers(window);
-    glfwPollEvents();
   }
 
   // glfw: terminate, clearing all previously allocated GLFW resources.
@@ -603,6 +728,12 @@ void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
 
 void mouse_button_callback(GLFWwindow *window, int button, int action,
                            int mods) {
+  if (imguiIO->WantCaptureMouse) {
+    ImGui_ImplGlfw_MouseButtonCallback(window, button, action,
+                                       mods); // Forward to ImGui
+    return;
+  }
+
   if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS &&
       lastFrame >= lastKnightStateSet + KNIGHT_ATTACK_DELAY) {
     lastKnightStateSet = lastFrame;

@@ -4,7 +4,14 @@
     "glad",
     "glfw3",
     "glm",
+    "miniaudio",
     "pugixml",
-    "miniaudio"
+    {
+      "name": "imgui",
+      "features": [
+        "glfw-binding",
+        "opengl3-binding"
+      ]
+    }
   ]
 }
