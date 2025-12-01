@@ -75,7 +75,11 @@ inline bool CheckAABBCollision(const glm::vec3 &posA, const glm::vec3 &sizeA,
   return collisionX && collisionY && collisionZ;
 }
 
-bool on_menu = true;
+// bool on_menu = true;
+
+enum class MenuType { START_MENU, LOSE, WIN, PLAYING };
+
+MenuType menu_state = MenuType::START_MENU;
 
 enum class HornetState {
   LUNGE_WAIT,
@@ -111,6 +115,7 @@ GLFWwindow *window;
 ImGuiIO *imguiIO;
 ImFont *font24;
 ImFont *font50;
+ImFont *font100;
 
 void randomHornetState() {
   if (hornetState == HornetState::DEAD) {
@@ -314,6 +319,12 @@ void onStartGame() {
   knight->velocity = glm::vec3(0.0);
 }
 
+void centerText(const char *text) {
+  float text_width = ImGui::CalcTextSize(text).x;
+  ImGui::SetCursorPosX((ImGui::GetWindowSize().x - text_width) * 0.5f);
+  ImGui::Text("%s", text);
+}
+
 void RenderMenu() {
   // window
   const ImGuiViewport *viewport = ImGui::GetMainViewport();
@@ -330,8 +341,7 @@ void RenderMenu() {
       ImGuiWindowFlags_NoNavFocus;
   ImGui::Begin("Main Window", nullptr, window_flags);
 
-  ImGui::SetCursorPosX(ImGui::GetWindowSize().x * 0.5f - 150.0f);
-  ImGui::Text("Hole Low Knight");
+  centerText("Hole Low Knight");
   ImGui::Spacing();
   ImGui::Spacing();
   float button_width = ImGui::GetWindowSize().x * 0.2f;
@@ -339,7 +349,7 @@ void RenderMenu() {
   ImGui::SetCursorPosX(ImGui::GetWindowSize().x * 0.5f - (button_width / 2));
 
   if (ImGui::Button("Start Game", ImVec2(button_width, button_height))) {
-    on_menu = false;
+    menu_state = MenuType::PLAYING;
     onStartGame();
     std::cout << "Starting the game!" << std::endl;
   }
@@ -363,10 +373,37 @@ void RenderMenu() {
   ImGui::End();
 }
 
+void RenderLoseWin(bool hasWon) {
+  // window
+  const ImGuiViewport *viewport = ImGui::GetMainViewport();
+
+  // 2. Set the next window's position and size to cover the viewport
+  ImGui::SetNextWindowPos(viewport->WorkPos);
+  ImGui::SetNextWindowSize(viewport->WorkSize);
+
+  ImGui::PushFont(font100);
+  ImGuiWindowFlags window_flags =
+      ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoTitleBar |
+      ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
+      ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus |
+      ImGuiWindowFlags_NoNavFocus;
+  ImGui::Begin("Main Window", nullptr, window_flags);
+
+  ImGui::SetCursorPosY(ImGui::GetWindowSize().y * 0.5f);
+  if (hasWon) {
+    centerText("YOU WON!!");
+  } else {
+    centerText("Better Luck Next Time~~");
+  }
+
+  ImGui::PopFont();
+  ImGui::End();
+}
+
 void playerTakeDamage(uint damage) {
   currentHealth -= damage;
   if (currentHealth == 0) {
-    on_menu = true;
+    menu_state = MenuType::LOSE;
   }
   playerHealth->setHealth(currentHealth, maxHealth);
 }
@@ -445,6 +482,8 @@ int main() {
       "resources/fonts/ComicSansMS3.ttf", 24.0f);
   font50 = imguiIO->Fonts->AddFontFromFileTTF(
       "resources/fonts/ComicSansMS3.ttf", 50.0f);
+  font100 = imguiIO->Fonts->AddFontFromFileTTF(
+      "resources/fonts/ComicSansMS3.ttf", 100.0f);
   ImGui_ImplGlfw_InitForOpenGL(window,
                                true); // 'true' sets up callbacks for input
   ImGui_ImplOpenGL3_Init("#version 330");
@@ -518,10 +557,21 @@ int main() {
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    if (on_menu) {
+    if (menu_state == MenuType::START_MENU) {
       glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 
       RenderMenu();
+
+      ImGui::Render();
+
+      glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+      ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    } else if (menu_state == MenuType::LOSE || menu_state == MenuType::WIN) {
+      glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+
+      RenderLoseWin(menu_state == MenuType::WIN);
 
       ImGui::Render();
 
@@ -624,7 +674,7 @@ int main() {
         hornet->lastHit = lastFrame;
         hornet->health -= 1;
         if (hornet->health == 0) {
-          on_menu = true;
+          menu_state = MenuType::WIN;
         }
         if (hornet->health == 0) {
           hornetState = HornetState::DEAD;
@@ -677,6 +727,11 @@ int main() {
 // frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
 void processInput(GLFWwindow *window, float deltaTime) {
+  if (menu_state == MenuType::LOSE || menu_state == MenuType::WIN) {
+    menu_state = MenuType::START_MENU;
+    return;
+  }
+
   if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
     glfwSetWindowShouldClose(window, true);
 
@@ -728,6 +783,11 @@ void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
 
 void mouse_button_callback(GLFWwindow *window, int button, int action,
                            int mods) {
+  if (menu_state == MenuType::LOSE || menu_state == MenuType::WIN) {
+    menu_state = MenuType::START_MENU;
+    return;
+  }
+
   if (imguiIO->WantCaptureMouse) {
     ImGui_ImplGlfw_MouseButtonCallback(window, button, action,
                                        mods); // Forward to ImGui
