@@ -235,14 +235,14 @@ public:
 
       glm::vec3 pos = glm::vec3(modelMtx[3]);
       pos.y += modelSize.y / 2.0;
-      hitbox->setVisible(true);
-      hitbox->draw(glm::translate(glm::mat4(1.0f), pos), hitboxShader);
+      // hitbox->setVisible(true);
+      // hitbox->draw(glm::translate(glm::mat4(1.0f), pos), hitboxShader);
 
       if (showHitbox && this->model->weaponHitbox != nullptr &&
           this->weaponNodeName != "") {
-        hitboxShader.use();
-        hitboxShader.setMat4("projection", projection);
-        hitboxShader.setMat4("view", view);
+        // hitboxShader.use();
+        // hitboxShader.setMat4("projection", projection);
+        // hitboxShader.setMat4("view", view);
 
         auto boneTransform =
             animator.GetGlobalNodeTransform(this->weaponNodeName);
@@ -264,10 +264,11 @@ public:
         //   //           << (boneTransform.has_value() ? "has bones" : "")
         //   //           << std::endl;
         // }
-        this->model->weaponHitbox->setVisible(true);
-        this->model->weaponHitbox->draw(
-            glm::translate(glm::mat4(1.0f), this->model->weaponPos),
-            hitboxShader);
+        
+        // this->model->weaponHitbox->setVisible(true);
+        // this->model->weaponHitbox->draw(
+        //     glm::translate(glm::mat4(1.0f), this->model->weaponPos),
+        //     hitboxShader);
       }
     }
   }

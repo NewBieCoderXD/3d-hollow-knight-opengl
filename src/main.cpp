@@ -117,6 +117,8 @@ ImFont *font24;
 ImFont *font50;
 ImFont *font100;
 
+float game_over_time = 0;
+
 void randomHornetState() {
   if (hornetState == HornetState::DEAD) {
     return;
@@ -404,6 +406,7 @@ void playerTakeDamage(uint damage) {
   currentHealth -= damage;
   if (currentHealth == 0) {
     menu_state = MenuType::LOSE;
+    game_over_time = static_cast<float>(glfwGetTime());
   }
   playerHealth->setHealth(currentHealth, maxHealth);
 }
@@ -674,6 +677,7 @@ int main() {
         hornet->lastHit = lastFrame;
         hornet->health -= 1;
         if (hornet->health == 0) {
+          game_over_time = static_cast<float>(glfwGetTime());
           menu_state = MenuType::WIN;
         }
         if (hornet->health == 0) {
@@ -727,7 +731,10 @@ int main() {
 // frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
 void processInput(GLFWwindow *window, float deltaTime) {
-  if (menu_state == MenuType::LOSE || menu_state == MenuType::WIN) {
+  float currentFrame = static_cast<float>(glfwGetTime());
+  if ((menu_state == MenuType::LOSE || menu_state == MenuType::WIN) &&
+      currentFrame >= 2.0 + game_over_time) {
+
     menu_state = MenuType::START_MENU;
     return;
   }
@@ -783,7 +790,9 @@ void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
 
 void mouse_button_callback(GLFWwindow *window, int button, int action,
                            int mods) {
-  if (menu_state == MenuType::LOSE || menu_state == MenuType::WIN) {
+  float currentFrame = static_cast<float>(glfwGetTime());
+  if ((menu_state == MenuType::LOSE || menu_state == MenuType::WIN) &&
+      currentFrame >= 2.0 + game_over_time) {
     menu_state = MenuType::START_MENU;
     return;
   }
