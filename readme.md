@@ -12,7 +12,7 @@ vcpkg install
 
 # Demo
 
-<video src="https://github.com/user-attachments/assets/6307729e-3d90-4077-81ad-62604b646595" controls width="600"></video>
+https://www.youtube.com/watch?v=JMAzQeg4HOU
 
 # Acknowledgements
 
