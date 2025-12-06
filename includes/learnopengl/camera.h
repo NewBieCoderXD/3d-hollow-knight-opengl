@@ -3,6 +3,7 @@
 
 #include "glm/ext/quaternion_trigonometric.hpp"
 #include "glm/trigonometric.hpp"
+#include <cmath>
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -122,10 +123,7 @@ public:
     // make sure that when pitch is out of bounds, screen doesn't get
     // flipped
     if (constrainPitch) {
-      if (Pitch > 70.0f)
-        Pitch = 70.0f;
-      if (Pitch < 5.0f)
-        Pitch = 5.0f;
+      Pitch = std::max(0.0f, std::min(40.0f, Pitch));
       // if (Pitch < -89.0f)
       //   Pitch = -89.0f;
     }
