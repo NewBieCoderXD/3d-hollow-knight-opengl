@@ -33,6 +33,8 @@
 #define MINIAUDIO_IMPLEMENTATION
 #include <miniaudio.h>
 
+#include "../includes/learnopengl/cubemap.hpp"
+
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
@@ -493,8 +495,7 @@ int main() {
 
   // build and compile shaders
   // -------------------------
-  Shader texturedModelShader("src/texturedModel.vert",
-                             "src/texturedModel.frag");
+  Shader skyboxShader("src/texturedModel.vert", "src/skybox.frag");
 
   Shader texturedModelWithBonesShader("src/texturedModelWithBones.vert",
                                       "src/texturedModelWithBones.frag");
@@ -524,7 +525,7 @@ int main() {
   knight.emplace(knightImporter, "resources/hollow-knight-the-knight.glb",
                  "knight", "Knight_Nail");
   knight->position.x = 3.0;
-  knight->model->weaponHitbox->scale = 2.0;
+  knight->model->weaponHitbox->scale = 3.0;
   knight->model->weaponSize *= 2.0;
 
   Assimp::Importer hornetImporter;
@@ -536,6 +537,11 @@ int main() {
   hornet->modelSize *= 0.7f;
   hornet->model->weaponHitbox->scale = 0.7;
   hornet->model->weaponSize *= 0.7;
+
+  Cubemap sky =
+      Cubemap({"resources/sky/right.jpeg", "resources/sky/left.jpeg",
+               "resources/sky/top.jpeg", "resources/sky/bottom.jpeg",
+               "resources/sky/front.jpeg", "resources/sky/back.jpeg"});
 
   // Assimp::Importer stoneGroundImporter;
   // ModelAnimationAbs stoneGround(stoneGroundImporter,
@@ -565,23 +571,15 @@ int main() {
 
       RenderMenu();
 
-      ImGui::Render();
-
       glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-      ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
     } else if (menu_state == MenuType::LOSE || menu_state == MenuType::WIN) {
       glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 
       RenderLoseWin(menu_state == MenuType::WIN);
 
-      ImGui::Render();
-
       glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-      ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
     } else {
       glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
       // per-framema_engine *pEngine time logic
@@ -602,6 +600,7 @@ int main() {
       // ------
       glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+      glEnable(GL_DEPTH_TEST);
 
       knight->updatePosition(deltaTime);
 
@@ -614,15 +613,9 @@ int main() {
                            (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
       glm::mat4 view = camera.GetViewMatrix();
 
-      // texturedModelWithBonesShader.use();
-
-      // texturedModelShader.use();
-
-      // simple3dShader.use();
-      // simple3dShader.setMat4("projection", projection);
-      // simple3dShader.setMat4("view", view);
-
-      // ground.Draw(simple3dShader);
+      glDepthMask(GL_FALSE);
+      sky.draw(skyboxShader, view, projection);
+      glDepthMask(GL_TRUE);
 
       // render the loaded model
       glm::mat4 model = glm::mat4(1.0f);
