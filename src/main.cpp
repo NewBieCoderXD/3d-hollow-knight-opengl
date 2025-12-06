@@ -1,5 +1,6 @@
 #include "glm/geometric.hpp"
 #include "learnopengl/bar.h"
+#include "learnopengl/grass_field.hpp"
 #include "learnopengl/group_plane.hpp"
 #include "learnopengl/model_animation.h"
 #include <GLFW/glfw3.h>
@@ -16,6 +17,7 @@
 
 #include <learnopengl/camera.h>
 #include <learnopengl/filesystem.h>
+#include <learnopengl/grass_field.hpp>
 #include <learnopengl/model.h>
 #include <learnopengl/model_animation_abstraction.h>
 #include <learnopengl/shader_m.h>
@@ -461,6 +463,7 @@ int main() {
   // configure global opengl state
   // -----------------------------
   glEnable(GL_DEPTH_TEST);
+  glDisable(GL_CULL_FACE);
 
   unsigned seed =
       std::chrono::high_resolution_clock::now().time_since_epoch().count();
@@ -506,7 +509,11 @@ int main() {
 
   Shader groundShader("src/ground.vert", "src/ground.frag");
 
+  Shader grassFieldShader("src/grass.vert", "src/grass.frag");
+
   GroundPlane ground("resources/grass_ground.png", 10000.0, 500.0);
+
+  GrassField grass = GrassField(100, 100, 0.3);
 
   // load models
   // -----------
@@ -616,6 +623,8 @@ int main() {
       sky.draw(skyboxShader, view, projection);
       glDepthMask(GL_TRUE);
 
+      grass.draw(grassFieldShader, currentFrame, view, projection);
+
       // render the loaded model
       glm::mat4 model = glm::mat4(1.0f);
       // Knight position is already updated above
@@ -627,7 +636,7 @@ int main() {
       hornet->draw(model, projection, view, texturedModelWithBonesShader,
                    simple3dShader, deltaTime, lastFrame);
 
-      ground.Draw(groundShader.ID, view, projection);
+      // ground.Draw(groundShader.ID, view, projection);
 
       if (currentFrame - firstRender > 3.0f) {
         if (hornetState == HornetState::IDLE &&
