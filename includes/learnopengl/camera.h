@@ -121,14 +121,14 @@ public:
 
     // make sure that when pitch is out of bounds, screen doesn't get
     // flipped
-    // if (constrainPitch) {
-    //   if (Pitch > 70.0f)
-    //     Pitch = 70.0f;
-    //   if (Pitch < 20.0f)
-    //     Pitch = 20.0f;
-    //   // if (Pitch < -89.0f)
-    //   //   Pitch = -89.0f;
-    // }
+    if (constrainPitch) {
+      if (Pitch > 70.0f)
+        Pitch = 70.0f;
+      if (Pitch < 5.0f)
+        Pitch = 5.0f;
+      // if (Pitch < -89.0f)
+      //   Pitch = -89.0f;
+    }
 
     // update Front, Right and Up Vectors using the updated Euler angles
     UpdateCameraVectors();

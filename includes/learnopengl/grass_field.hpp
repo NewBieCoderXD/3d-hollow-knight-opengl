@@ -1,19 +1,22 @@
 #pragma once
 #include "learnopengl/shader.h"
-#include <chrono>
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include <random>
 #include <vector>
 
 class GrassField {
 public:
-  GrassField(int gridX, int gridZ, float spacing) {
+  int gridX, gridZ;
+  float spacing;
+
+  GrassField(int gridX, int gridZ, float spacing)
+      : gridX(gridX), gridZ(gridZ), spacing(spacing) {
     std::vector<float> verts;
     std::vector<unsigned int> idx;
     buildBladeMesh(verts, idx);
     indexCount = (GLsizei)idx.size();
+    instanceCount = (GLsizei)gridX * gridZ; // Total instances needed
 
     glGenVertexArrays(1, &vao);
     glBindVertexArray(vao);
@@ -28,29 +31,15 @@ public:
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, idx.size() * sizeof(unsigned int),
                  idx.data(), GL_STATIC_DRAW);
 
-    // glEnableVertexAttribArray(0);
-    // glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float),
-    //                       (void *)0);
-
-    // glEnableVertexAttribArray(1);
-    // glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float),
-    //                       (void *)(2 * sizeof(float)));
+    // Position (Location 0: 3 floats)
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
                           (void *)0);
 
-    // texcoord = 2 floats
+    // TexCoord (Location 1: 2 floats)
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
                           (void *)(3 * sizeof(float)));
-
-    buildInstances(gridX, gridZ, spacing);
-
-    glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(InstanceData),
-                          (void *)0);
-    glVertexAttribDivisor(2, 1);
 
     glBindVertexArray(0);
   }
@@ -60,6 +49,14 @@ public:
     shader.setFloat("uTime", time);
     shader.setMat4("view", view);
     shader.setMat4("projection", projection);
+
+    shader.setInt("uGridX", gridX);
+    shader.setFloat("uSpacing", spacing);
+
+    // Calculate the overall field offset once and pass it
+    float offX = -gridX * spacing * 0.5f;
+    float offZ = -gridZ * spacing * 0.5f;
+    shader.setVec2("uOffset", glm::vec2(offX, offZ));
 
     glBindVertexArray(vao);
     glDrawElementsInstanced(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, 0,
@@ -86,7 +83,7 @@ private:
   void buildBladeMesh(std::vector<float> &verts,
                       std::vector<unsigned int> &idx) {
     float h = 1.5f;
-    float w = 0.25f;
+    float w = 0.2f;
 
     // 3D triangular grass blade
     // Format: x, y, z, u, v
@@ -110,32 +107,32 @@ private:
   // ----------------------------------------------------------------------
   // Build instances
   // ----------------------------------------------------------------------
-  void buildInstances(int gridX, int gridZ, float spacing) {
-    std::vector<InstanceData> data;
-    data.reserve(gridX * gridZ);
+  // void buildInstances(int gridX, int gridZ, float spacing) {
+  //   std::vector<InstanceData> data;
+  //   data.reserve(gridX * gridZ);
 
-    float offX = -gridX * spacing * 0.5f;
-    float offZ = -gridZ * spacing * 0.5f;
+  //   float offX = -gridX * spacing * 0.5f;
+  //   float offZ = -gridZ * spacing * 0.5f;
 
-    std::mt19937 rng((unsigned)std::chrono::high_resolution_clock::now()
-                         .time_since_epoch()
-                         .count());
-    std::uniform_real_distribution<float> jitter(-0.02f, 0.02f);
-    std::uniform_real_distribution<float> phaseDist(0.0f, 6.28318f);
+  //   std::mt19937 rng((unsigned)std::chrono::high_resolution_clock::now()
+  //                        .time_since_epoch()
+  //                        .count());
+  //   std::uniform_real_distribution<float> jitter(-0.1f, 0.1f);
+  //   std::uniform_real_distribution<float> phaseDist(0.0f, 6.28318f);
 
-    for (int x = 0; x < gridX; x++) {
-      for (int z = 0; z < gridZ; z++) {
-        float px = offX + x * spacing + jitter(rng);
-        float pz = offZ + z * spacing + jitter(rng);
-        data.push_back({px, 0.0f, pz, phaseDist(rng)});
-      }
-    }
+  //   for (int x = 0; x < gridX; x++) {
+  //     for (int z = 0; z < gridZ; z++) {
+  //       float px = offX + x * spacing + jitter(rng);
+  //       float pz = offZ + z * spacing + jitter(rng);
+  //       data.push_back({px, 0.0f, pz, phaseDist(rng)});
+  //     }
+  //   }
 
-    instanceCount = (GLsizei)data.size();
+  //   instanceCount = (GLsizei)data.size();
 
-    glGenBuffers(1, &instanceVBO);
-    glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
-    glBufferData(GL_ARRAY_BUFFER, data.size() * sizeof(InstanceData),
-                 data.data(), GL_STATIC_DRAW);
-  }
+  //   glGenBuffers(1, &instanceVBO);
+  //   glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
+  //   glBufferData(GL_ARRAY_BUFFER, data.size() * sizeof(InstanceData),
+  //                data.data(), GL_STATIC_DRAW);
+  // }
 };

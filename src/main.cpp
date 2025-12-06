@@ -513,7 +513,7 @@ int main() {
 
   GroundPlane ground("resources/grass_ground.png", 10000.0, 500.0);
 
-  GrassField grass = GrassField(100, 100, 0.3);
+  GrassField grass = GrassField(1000, 1000, 0.3);
 
   // load models
   // -----------
@@ -636,7 +636,7 @@ int main() {
       hornet->draw(model, projection, view, texturedModelWithBonesShader,
                    simple3dShader, deltaTime, lastFrame);
 
-      // ground.Draw(groundShader.ID, view, projection);
+      ground.Draw(groundShader.ID, view, projection);
 
       if (currentFrame - firstRender > 3.0f) {
         if (hornetState == HornetState::IDLE &&
