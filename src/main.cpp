@@ -538,10 +538,9 @@ int main() {
   hornet->model->weaponHitbox->scale = 0.7;
   hornet->model->weaponSize *= 0.7;
 
-  Cubemap sky =
-      Cubemap({"resources/sky/right.jpeg", "resources/sky/left.jpeg",
-               "resources/sky/top.jpeg", "resources/sky/bottom.jpeg",
-               "resources/sky/front.jpeg", "resources/sky/back.jpeg"});
+  Cubemap sky = Cubemap({"resources/sky/right.png", "resources/sky/left.png",
+                         "resources/sky/top.png", "resources/sky/bottom.png",
+                         "resources/sky/front.png", "resources/sky/back.png"});
 
   // Assimp::Importer stoneGroundImporter;
   // ModelAnimationAbs stoneGround(stoneGroundImporter,

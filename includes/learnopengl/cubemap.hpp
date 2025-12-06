@@ -7,8 +7,6 @@ class Cubemap {
 public:
   GLuint VAO = 0, VBO = 0;
   uint textureID;
-  glm::vec3 color;
-  bool visible;
 
   Cubemap(std::vector<std::string> faces) {
     initBox();
@@ -16,6 +14,7 @@ public:
   }
 
   unsigned int loadCubemap(std::vector<std::string> faces) {
+    stbi_set_flip_vertically_on_load(false);
     glGenTextures(1, &textureID);
     glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
 
@@ -24,8 +23,16 @@ public:
       unsigned char *data = stbi_load(FileSystem::getPath(faces[i]).c_str(),
                                       &width, &height, &nrChannels, 0);
       if (data) {
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, width,
-                     height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        GLenum format = GL_RGB;
+        if (nrChannels == 1)
+          format = GL_RED;
+        else if (nrChannels == 3)
+          format = GL_RGB;
+        else if (nrChannels == 4)
+          format = GL_RGBA;
+
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, format, width,
+                     height, 0, format, GL_UNSIGNED_BYTE, data);
         stbi_image_free(data);
       } else {
         std::cout << "Cubemap tex failed to load at path: " << faces[i]
